@@ -18,6 +18,7 @@ import { RequestWithClient } from "../request-with-client.interface";
 import { Player } from "../../../objects/player.interfaace";
 import { MatchRequestDto } from "../../matches/match-request.dto";
 import { PlayerJoinRequestDto } from "../../matches/player-join-request.dto";
+import { Server, ServerStatus } from "../../../objects/server.interface";
 
 interface PlayerJoinRequest extends RequestWithClient {
 	player: Player
@@ -75,5 +76,14 @@ export class MatchesController {
 	@UsePipes(new ValidationPipe())
 	async playerJointMatch(@Body() body: PlayerJoinRequestDto, @Req() request: RequestWithClient, @Param("id") id: string): Promise<Match> {
 		return this.service.playerJoin(request.client, id, body);
+	}
+
+
+	/**
+	 * Server callback
+	 */
+	@Post("/server/callback")
+	async callback(@Body() body: Server, @Query("status") status: ServerStatus): Promise<void> {
+		await this.service.handleServerStatusChange(body, status);
 	}
 }

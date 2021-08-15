@@ -1,3 +1,13 @@
 {
-  "mongodbUri": ""
+  "mongodbUri": "",
+  "localhost": "",
+  "monitoring": {
+    "enabled": true,
+    "interval": 15
+  },
+  "lighthouse": {
+    "host": "",
+    "clientId": "",
+    "clientSecret": ""
+  }
 }
