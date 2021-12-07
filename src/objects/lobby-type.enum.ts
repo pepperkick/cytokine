@@ -1,0 +1,5 @@
+export enum LobbyType {
+	ROLE_BASED = "ROLE_BASED",
+	TEAM_ROLE_BASED = "TEAM_ROLE_BASED",
+	NO_ROLE_BASED = "NO_ROLE_BASED"
+}

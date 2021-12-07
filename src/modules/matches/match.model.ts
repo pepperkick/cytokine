@@ -1,8 +1,8 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document } from 'mongoose';
 import { Game } from "../../objects/game.enum";
-import { Player } from "../../objects/player.interfaace";
-import { MatchStatus } from "../../objects/match-status.enum";
+import { Player } from "./match-player.interfaace";
+import { MatchStatus } from "./match-status.enum";
 
 @Schema()
 export class Match extends Document {

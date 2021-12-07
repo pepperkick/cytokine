@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MatchesService } from "./matches.service";
+import { MatchService } from "./match.service";
 import { MongooseModule } from "@nestjs/mongoose";
 import { Match, MatchSchema } from "./match.model";
 
@@ -9,7 +9,7 @@ import { Match, MatchSchema } from "./match.model";
 			{ name: Match.name, schema: MatchSchema }
 		])
 	],
-	providers: [ MatchesService ],
-	exports: [ MatchesService ]
+	providers: [ MatchService ],
+	exports: [ MatchService ]
 })
-export class MatchesModule {}
+export class MatchModule {}

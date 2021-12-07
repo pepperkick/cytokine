@@ -11,11 +11,11 @@ import {
 	UsePipes,
 	ValidationPipe
 } from "@nestjs/common";
-import { MatchesService, MatchRequestOptions } from "../../matches/matches.service";
+import { MatchService, MatchRequestOptions } from "../../matches/match.service";
 import { Match } from "../../matches/match.model";
 import { ClientGuard } from "./client.guard";
 import { RequestWithClient } from "../request-with-client.interface";
-import { Player } from "../../../objects/player.interfaace";
+import { Player } from "../../matches/match-player.interfaace";
 import { MatchRequestDto } from "../../matches/match-request.dto";
 import { PlayerJoinRequestDto } from "../../matches/player-join-request.dto";
 import { Server, ServerStatus } from "../../../objects/server.interface";
@@ -26,10 +26,10 @@ interface PlayerJoinRequest extends RequestWithClient {
 
 @Controller("/api/v1/matches")
 export class MatchesController {
-	constructor(private readonly service: MatchesService) {}
+	constructor(private readonly service: MatchService) {}
 
 	/**
-	 * Get list of servers by client
+	 * Get list of matches by client
 	 */
 	@Get("/")
 	@UseGuards(ClientGuard)
@@ -77,7 +77,6 @@ export class MatchesController {
 	async playerJointMatch(@Body() body: PlayerJoinRequestDto, @Req() request: RequestWithClient, @Param("id") id: string): Promise<Match> {
 		return this.service.playerJoin(request.client, id, body);
 	}
-
 
 	/**
 	 * Server callback

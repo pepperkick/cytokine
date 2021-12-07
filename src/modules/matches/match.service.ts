@@ -3,9 +3,9 @@ import { Model } from "mongoose";
 import { InjectModel } from "@nestjs/mongoose";
 import { Match } from "./match.model";
 import { Client } from "../clients/client.model";
-import { MatchStatus } from "../../objects/match-status.enum";
+import { MatchStatus } from "./match-status.enum";
 import { Game } from "../../objects/game.enum";
-import { Player } from "../../objects/player.interfaace";
+import { Player } from "./match-player.interfaace";
 import { MatchRequestDto } from "./match-request.dto";
 import { PlayerJoinRequestDto } from "./player-join-request.dto";
 import axios from 'axios';
@@ -34,15 +34,15 @@ export const MATCH_ACTIVE_STATUS_CONDITION = [
 	{ status: MatchStatus.LIVE }
 ]
 
-export class MatchesService {
-	private readonly logger = new Logger(MatchesService.name);
+export class MatchService {
+	private readonly logger = new Logger(MatchService.name);
 
 	constructor(
 		@InjectModel(Match.name) private repository: Model<Match>,
 	) {
 		if (config.monitoring.enabled === true) {
 			setInterval(async () => {
-				await this.monitor();
+				// await this.monitor();
 			}, config.monitoring.interval * 1000)
 		}
 	}
@@ -117,7 +117,7 @@ export class MatchesService {
 	}
 
 	/**
-	 * Get all active matchers
+	 * Get all active matches
 	 */
 	async getAllActive(): Promise<Match[]> {
 		return this.repository.find({ $or: MATCH_ACTIVE_STATUS_CONDITION });
@@ -263,7 +263,7 @@ export class MatchesService {
 	async createServerForMatch(match: Match) {
 		await this.updateStatusAndNotify(match, MatchStatus.CREATING_SERVER)
 
-		const providers = await MatchesService.getAvailableRegionProvider(match.region)
+		const providers = await MatchService.getAvailableRegionProvider(match.region)
 		if (providers.length === 0) {
 			await this.updateStatusAndNotify(match, MatchStatus.FAILED)
 			throw new Error(`Cannot create server for match ${match._id} as there are no available provider in region ${match.region}`)
@@ -277,7 +277,7 @@ export class MatchesService {
 		}
 
 		try {
-			const server = await MatchesService.sendServerCreateRequest(options)
+			const server = await MatchService.sendServerCreateRequest(options)
 			match.server = server._id;
 			await match.save();
 		} catch (error) {

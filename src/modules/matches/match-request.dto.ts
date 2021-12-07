@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsArray, IsNumber, Min, Max } from 'class-validator';
 import { Game } from "../../objects/game.enum";
-import { Player } from "../../objects/player.interfaace";
+import { Player } from "./match-player.interfaace";
 
 export class MatchRequestDto {
 	@IsString()

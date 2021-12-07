@@ -1,10 +1,12 @@
 import { Module } from "@nestjs/common";
-import { MatchesModule } from "../../matches/matches.module";
+import { MatchModule } from "../../matches/match.module";
 import { MatchesController } from "./matches.controller";
 import { ClientsModule } from "../../clients/clients.module";
+import { LobbiesController } from "./lobbies.controller";
+import { LobbyModule } from "../../lobbies/lobby.module";
 
 @Module({
-  imports: [ MatchesModule, ClientsModule ],
-  controllers: [ MatchesController ]
+  imports: [ MatchModule, ClientsModule, LobbyModule ],
+  controllers: [ MatchesController, LobbiesController ]
 })
 export class V1Module {}
