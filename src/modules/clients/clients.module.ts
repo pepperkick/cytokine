@@ -4,12 +4,10 @@ import { ClientsService } from './clients.service';
 import { Client, ClientSchema } from './client.model';
 
 @Module({
-	imports: [
-		MongooseModule.forFeature([
-			{ name: Client.name, schema: ClientSchema }
-		])
-	],
-	providers: [ ClientsService ],
-	exports: [ ClientsService ]
+  imports: [
+    MongooseModule.forFeature([{ name: Client.name, schema: ClientSchema }]),
+  ],
+  providers: [ClientsService],
+  exports: [ClientsService],
 })
 export class ClientsModule {}
