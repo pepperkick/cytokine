@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsArray, IsNumber, Min, Max } from 'class-validator';
 import { Game } from "../../objects/game.enum";
-import { Player } from "./match-player.interfaace";
+import { Player } from "./match-player.interfaace"
 
 export class MatchRequestDto {
 	@IsString()
@@ -13,14 +13,15 @@ export class MatchRequestDto {
 	region: string;
 
 	@IsOptional()
-	callbackUrl: string
+	callbackUrl?: string
 
 	@IsArray()
 	@IsOptional()
-	players: Player[]
+	players?: Player[]
 
 	@IsNumber()
+	@IsOptional()
 	@Min(2)
 	@Max(20)
-	requiredPlayers: number
+	requiredPlayers?: number
 }

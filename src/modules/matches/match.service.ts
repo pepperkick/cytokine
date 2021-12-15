@@ -12,25 +12,8 @@ import axios from 'axios';
 import * as config from '../../../config.json';
 import { Server, ServerRequestOptions, ServerStatus } from "../../objects/server.interface";
 
-export interface MatchRequestOptions {
-	// Game to use for the match
-	game: Game
-
-	// Region of the match and server
-	region: string
-
-	// URL to send a POST request when status of the request changes
-	callbackUrl: string
-
-	// List of players
-	players: Player[]
-
-	// Number of players required in this match
-	requiredPlayers: number
-}
-
 export const MATCH_ACTIVE_STATUS_CONDITION = [
-	{ status: MatchStatus.WAITING_FOR_REQUIRED_PLAYERS },
+	{ status: MatchStatus.WAITING_FOR_LOBBY },
 	{ status: MatchStatus.LIVE }
 ]
 
@@ -152,16 +135,16 @@ export class MatchService {
 				`Cannot create new server as client has reached the limit.`, 429);
 
 		const match = new this.repository({
+			createdAt: new Date(),
 			client: client.id,
-			callbackUrl, region, game
-		});
-		match.createdAt = new Date();
-		match.status = MatchStatus.WAITING_FOR_REQUIRED_PLAYERS;
-		match.players = options.players || []
-		match.preferences = {
+			callbackUrl, region, game,
+			status: MatchStatus.WAITING_FOR_LOBBY,
+			players: options.players || [],
 			requiredPlayers: options.requiredPlayers,
-			createLighthouseServer: true
-		}
+			preferences: {
+				createLighthouseServer: true
+			}
+		});
 		await match.save()
 
 		return match;
@@ -177,12 +160,8 @@ export class MatchService {
 	async playerJoin(client: Client, id: string, player: PlayerJoinRequestDto): Promise<Match> {
 		const match = await this.getById(id)
 
-		if (match.status != MatchStatus.WAITING_FOR_REQUIRED_PLAYERS) {
+		if (match.status != MatchStatus.WAITING_FOR_LOBBY) {
 			throw new BadRequestException({ message: "Cannot join this match" })
-		}
-
-		if (match.players.length >= match.preferences.requiredPlayers) {
-			throw new BadRequestException({ message: "Match has reached the required count" })
 		}
 
 		match.players.push(player)
@@ -217,42 +196,6 @@ export class MatchService {
 		}
 
 		await match.save()
-	}
-
-	/**
-	 * Check all matches for actions
-	 */
-	async monitor(): Promise<void> {
-		// Check if required players are present in waiting matches
-		const waitingForPlayerMatches = await this.repository.find({
-			status: MatchStatus.WAITING_FOR_REQUIRED_PLAYERS
-		});
-		this.logger.debug(`Found ${waitingForPlayerMatches.length} matches that are waiting for players...`)
-		for (const match of waitingForPlayerMatches) {
-			setTimeout(async () => {
-				await this.checkForRequiredPlayers(match)
-			}, 100);
-		}
-	}
-
-	/**
-	 * Check if the match has required players
-	 *
-	 * @param match
-	 */
-	async checkForRequiredPlayers(match: Match): Promise<void> {
-		const count = match.players.length
-		const required = match.preferences.requiredPlayers
-
-		this.logger.debug(`Match ${match._id} has (${count} / ${required}) players`);
-
-		if (count >= required) {
-			if (match.preferences.createLighthouseServer) {
-				await this.createServerForMatch(match)
-			}
-
-			// TODO: Do something if lighthouse server creation is false
-		}
 	}
 
 	/**

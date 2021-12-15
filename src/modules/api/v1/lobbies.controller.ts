@@ -1,14 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
-import { MatchesController } from "./matches.controller";
-import { MatchService } from "../../matches/match.service";
 import { LobbyService } from "../../lobbies/lobby.serivce";
 import { ClientGuard } from "./client.guard";
 import { RequestWithClient } from "../request-with-client.interface";
-import { Match } from "../../matches/match.model";
 import { Lobby } from "../../lobbies/lobby.model";
-import { MatchRequestDto } from "../../matches/match-request.dto";
 import { LobbyRequestDto } from "../../lobbies/lobby-request.dto";
-import { PlayerJoinRequestDto } from "../../matches/player-join-request.dto";
+import { PlayerJoinRequestDto } from "../../lobbies/player-join-request.dto";
 
 @Controller("/api/v1/lobbies")
 export class LobbiesController {
@@ -31,7 +27,7 @@ export class LobbiesController {
 	 */
 	@Post("/")
 	@UseGuards(ClientGuard)
-	@UsePipes(new ValidationPipe())
+	@UsePipes(new ValidationPipe({ transform: true }))
 	async create(@Body() body: LobbyRequestDto, @Req() request: RequestWithClient): Promise<Lobby> {
 		return this.service.createRequest(request.client, body);
 	}

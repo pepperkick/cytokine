@@ -32,7 +32,7 @@ export class Match extends Document {
 
 	@Prop({ type: Object })
 	preferences: {
-		requiredPlayers: number
+		requiredPlayers?: number
 		createLighthouseServer?: boolean
 	}
 }

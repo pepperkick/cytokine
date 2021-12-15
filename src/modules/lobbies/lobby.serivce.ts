@@ -7,12 +7,12 @@ import { Lobby } from "./lobby.model";
 import { Client } from "../clients/client.model";
 import { MatchService } from "../matches/match.service";
 import { LobbyRequestDto } from "./lobby-request.dto";
-import { PlayerJoinRequestDto } from "../matches/player-join-request.dto";
+import { PlayerJoinRequestDto } from "./player-join-request.dto";
 import { LobbyStatus } from "./lobby-status.enum";
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
 	{ status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
-	{ status: LobbyStatus.LIVE }
+	{ status: LobbyStatus.DISTRIBUTING }
 ]
 
 export class LobbyService {
@@ -21,7 +21,13 @@ export class LobbyService {
 	constructor(
 		@InjectModel(Lobby.name) private repository: Model<Lobby>,
 		private matchService: MatchService
-	) { }
+	) {
+		if (config.monitoring.enabled === true) {
+			setInterval(async () => {
+				await this.monitor();
+			}, config.monitoring.interval * 1000)
+		}
+	}
 
 	/**
 	 * Get lobby by id
@@ -106,15 +112,20 @@ export class LobbyService {
 	 * @param options - Options for server
 	 */
 	async createRequest(client: Client, options: LobbyRequestDto): Promise<Lobby> {
-		const match = await this.matchService.createRequest(client, options)
+		if (!options.matchOptions.callbackUrl) {
+			options.matchOptions.callbackUrl = options.callbackUrl;
+		}
 
+		const match = await this.matchService.createRequest(client, options.matchOptions)
 		const lobby = new this.repository({
 			match: match._id,
-			type: options.type,
+			status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
+			distribution: options.distribution,
+			createdAt: new Date(),
+			requirements: options.requirements,
+			queuedPlayers: options.queuedPlayers || [],
+			callbackUrl: options.callbackUrl || ""
 		});
-		lobby.createdAt = new Date()
-		lobby.requirements = options.requirements
-		lobby.queuedPlayers = options.players || []
 		await lobby.save()
 
 		return lobby
@@ -125,7 +136,7 @@ export class LobbyService {
 	 *
 	 * @param client
 	 * @param id = Match ID
-	 * @param player - Player Object
+	 * @param player - Player Request Object
 	 */
 	async playerJoin(client: Client, id: string, player: PlayerJoinRequestDto): Promise<Lobby> {
 		const lobby = await this.getById(id)
@@ -135,7 +146,59 @@ export class LobbyService {
 		}
 
 		lobby.queuedPlayers.push(player)
+		lobby.markModified("queuedPlayers")
 		await lobby.save()
 		return lobby
+	}
+
+	/**
+	 * Check if the lobby requirements are met
+	 *
+	 * @param lobby
+	 */
+	async checkForRequiredPlayers(lobby: Lobby): Promise<boolean> {
+		const players = lobby.queuedPlayers
+		const requirements = lobby.requirements
+		const count = {}
+
+		players.forEach(item => {
+			item.roles.forEach(role => {
+				count[role] ? count[role]++ : count[role] = 1
+			})
+		})
+
+		const unfilled = requirements.filter(item => count[item.name] < item.count)
+		const overfilled = requirements.filter(item => count[item.name] > item.count && !item.overfill)
+
+		this.logger.debug(`Match ${lobby._id} has ${unfilled.length} unfilled roles: [${unfilled.map(item => item.name).join(", ")}]`);
+		this.logger.debug(`Match ${lobby._id} has ${overfilled.length} overfilled roles: [${overfilled.map(item => item.name).join(", ")}]`);
+
+		return unfilled.length === 0 && overfilled.length === 0
+	}
+
+	/**
+	 * Check all matches for actions
+	 */
+	async monitor(): Promise<void> {
+		// Check if required players are present in waiting lobbies
+		const waitingForPlayerLobbies = await this.repository.find({
+			status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS
+		});
+
+		this.logger.debug(`Found ${waitingForPlayerLobbies.length} matches that are waiting for players...`)
+
+		for (const lobby of waitingForPlayerLobbies) {
+			setTimeout(async () => {
+				await this.monitorLobby(lobby)
+			}, 100);
+		}
+	}
+
+	async monitorLobby(lobby: Lobby) {
+		if (await this.checkForRequiredPlayers(lobby)) {
+			this.logger.log(`Lobby ${lobby._id} has enough players!`)
+			this.logger.debug(lobby)
+			// TODO: Next step after players have joined
+		}
 	}
 }
