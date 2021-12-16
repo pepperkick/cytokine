@@ -124,6 +124,7 @@ export class LobbyService {
     );
     const lobby = new this.repository({
       match: match._id,
+      client: client.id,
       status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
       distribution: options.distribution,
       createdAt: new Date(),
@@ -140,14 +141,16 @@ export class LobbyService {
    * Let player join a lobby
    *
    * @param client
-   * @param id = Match ID
+   * @param id = Lobby ID
    * @param player - Player Request Object
    */
-  async playerJoin(
+  async addPlayer(
     client: Client,
     id: string,
     player: PlayerJoinRequestDto,
   ): Promise<Lobby> {
+    // TODO: Verify client has access to this lobby
+
     const lobby = await this.getById(id);
 
     if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
@@ -155,6 +158,157 @@ export class LobbyService {
     }
 
     lobby.queuedPlayers.push(player);
+    lobby.markModified('queuedPlayers');
+    await lobby.save();
+    return lobby;
+  }
+
+  /**
+   * Get player in lobby by ID
+   *
+   * @param client
+   * @param id = Lobby ID
+   * @param pid - Player ID
+   * @param type - Type of player ID (steam or discord)
+   */
+  async getPlayer(
+    client: Client,
+    id: string,
+    pid: string,
+    type: 'discord' | 'steam' | 'name',
+  ) {
+    // TODO: Verify client has access to this lobby
+
+    const lobby = await this.getById(id);
+    return lobby.queuedPlayers.filter((player) =>
+      type === 'discord'
+        ? player.discord === pid
+        : type === 'steam'
+        ? player.steam === pid
+        : player.name === pid,
+    )[0];
+  }
+
+  /**
+   * Remove player from lobby by ID
+   *
+   * @param client
+   * @param id = Lobby ID
+   * @param pid - Player ID
+   * @param type - Type of player ID
+   */
+  async removePlayer(
+    client: Client,
+    id: string,
+    pid: string,
+    type: 'discord' | 'steam' | 'name',
+  ) {
+    // TODO: Verify client has access to this lobby
+
+    const lobby = await this.getById(id);
+
+    if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
+      throw new BadRequestException({ message: 'Cannot leave this lobby' });
+    }
+
+    lobby.queuedPlayers = lobby.queuedPlayers.filter(
+      (player) =>
+        !(type === 'discord'
+          ? player.discord === pid
+          : type === 'steam'
+          ? player.steam === pid
+          : player.name === pid),
+    );
+    lobby.markModified('queuedPlayers');
+    await lobby.save();
+    return lobby;
+  }
+
+  /**
+   * Add role to player in lobby
+   *
+   * @param client
+   * @param id = Lobby ID
+   * @param pid - Player ID
+   * @param type - Type of player ID
+   * @param role - Role to add
+   */
+  async addPlayerRole(
+    client: Client,
+    id: string,
+    pid: string,
+    type: 'discord' | 'steam' | 'name',
+    role: string,
+  ) {
+    // TODO: Verify client has access to this lobby
+
+    const lobby = await this.getById(id);
+
+    if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
+      throw new BadRequestException({
+        message: 'Cannot add role for this player in this lobby',
+      });
+    }
+
+    const index = lobby.queuedPlayers.findIndex((player) =>
+      type === 'discord'
+        ? player.discord === pid
+        : type === 'steam'
+        ? player.steam === pid
+        : player.name === pid,
+    );
+
+    if (index === -1) {
+      throw new NotFoundException('Player not found');
+    }
+
+    lobby.queuedPlayers[index].roles.push(role);
+    lobby.markModified('queuedPlayers');
+    await lobby.save();
+    return lobby;
+  }
+
+  /**
+   * Remove role from player in lobby
+   *
+   * @param client
+   * @param id = Lobby ID
+   * @param pid - Player ID
+   * @param type - Type of player ID
+   * @param role - Role to add
+   */
+  async removePlayerRole(
+    client: Client,
+    id: string,
+    pid: string,
+    type: 'discord' | 'steam' | 'name',
+    role: string,
+  ) {
+    // TODO: Verify client has access to this lobby
+
+    const lobby = await this.getById(id);
+
+    if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
+      throw new BadRequestException({
+        message: 'Cannot add role for this player in this lobby',
+      });
+    }
+
+    const index = lobby.queuedPlayers.findIndex((player) =>
+      type === 'discord'
+        ? player.discord === pid
+        : type === 'steam'
+        ? player.steam === pid
+        : player.name === pid,
+    );
+
+    if (index === -1) {
+      throw new NotFoundException('Player not found');
+    }
+
+    lobby.queuedPlayers[index].roles = lobby.queuedPlayers[index].roles.filter(
+      (r) => r !== role,
+    );
     lobby.markModified('queuedPlayers');
     await lobby.save();
     return lobby;
@@ -176,8 +330,8 @@ export class LobbyService {
       });
     });
 
-    const unfilled = requirements.filter(
-      (item) => count[item.name] < item.count,
+    const unfilled = requirements.filter((item) =>
+      count[item.name] ? count[item.name] < item.count : true,
     );
     const overfilled = requirements.filter(
       (item) => count[item.name] > item.count && !item.overfill,

@@ -14,6 +14,9 @@ export class Lobby extends Document {
   @Prop()
   match: string;
 
+  @Prop({ type: String, required: true })
+  client: string;
+
   @Prop()
   callbackUrl: string;
 
