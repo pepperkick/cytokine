@@ -8,6 +8,7 @@ import { MatchService } from '../matches/match.service';
 import { LobbyRequestDto } from './lobby-request.dto';
 import { PlayerJoinRequestDto } from './player-join-request.dto';
 import { LobbyStatus } from './lobby-status.enum';
+import { DistributorService } from "../distributor/distributor.service";
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -20,6 +21,7 @@ export class LobbyService {
   constructor(
     @InjectModel(Lobby.name) private repository: Model<Lobby>,
     private matchService: MatchService,
+    private distributorService: DistributorService
   ) {
     if (config.monitoring.enabled === true) {
       setInterval(async () => {
@@ -361,21 +363,38 @@ export class LobbyService {
     });
 
     this.logger.debug(
-      `Found ${waitingForPlayerLobbies.length} matches that are waiting for players...`,
+      `Found ${waitingForPlayerLobbies.length} lobbies that are waiting for players...`,
     );
 
     for (const lobby of waitingForPlayerLobbies) {
       setTimeout(async () => {
-        await this.monitorLobby(lobby);
+        await this.monitorLobbyForPlayers(lobby);
       }, 100);
     }
   }
 
-  async monitorLobby(lobby: Lobby) {
+  async monitorLobbyForPlayers(lobby: Lobby) {
     if (await this.checkForRequiredPlayers(lobby)) {
-      this.logger.log(`Lobby ${lobby._id} has enough players!`);
-      this.logger.debug(lobby);
-      // TODO: Next step after players have joined
+      setTimeout(async () => {
+        await this.processLobby(lobby);
+      }, 100);
     }
+  }
+
+  /**
+   * Process the lobby as there are enough players
+   *
+   * @param lobby
+   */
+  async processLobby(lobby: Lobby) {
+    this.logger.log(`Lobby ${lobby._id} has enough players!`);
+    this.logger.debug(lobby);
+
+    await lobby.updateStatus(LobbyStatus.DISTRIBUTING);
+    await this.distributorService.distribute(lobby);
+    await lobby.updateStatus(LobbyStatus.DISTRIBUTED);
+
+    this.logger.log(`Lobby ${lobby._id} has been distributed!`);
+    this.logger.debug(lobby);
   }
 }
