@@ -90,6 +90,19 @@ export class MatchesController {
   }
 
   /**
+   * Get server details for the match
+   */
+  @Get('/:id/server')
+  @UseGuards(ClientGuard)
+  @UsePipes(new ValidationPipe())
+  async serverInfo(
+    @Req() request: RequestWithClient,
+    @Param('id') id: string,
+  ): Promise<Match> {
+    return this.service.getServerInfo(request.client, id);
+  }
+
+  /**
    * Server callback
    */
   @Post('/server/callback')

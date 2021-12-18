@@ -14,14 +14,12 @@ import { MatchRequestDto } from './match-request.dto';
 import { PlayerJoinRequestDto } from './player-join-request.dto';
 import axios from 'axios';
 import * as config from '../../../config.json';
-import {
-  Server,
-  ServerRequestOptions,
-  ServerStatus,
-} from '../../objects/server.interface';
+import { Server, ServerStatus } from '../../objects/server.interface';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
+  { status: MatchStatus.LOBBY_READY },
+  { status: MatchStatus.CREATING_SERVER },
   { status: MatchStatus.LIVE },
 ];
 
@@ -164,6 +162,7 @@ export class MatchService {
       requiredPlayers: options.requiredPlayers,
       preferences: {
         createLighthouseServer: true,
+        lighthouseProvider: options.preference?.lighthouseProvider,
       },
     });
     await match.save();
@@ -183,6 +182,8 @@ export class MatchService {
     id: string,
     player: PlayerJoinRequestDto,
   ): Promise<Match> {
+    // TODO: Verify client
+
     const match = await this.getById(id);
 
     if (match.status != MatchStatus.WAITING_FOR_LOBBY) {
@@ -260,11 +261,18 @@ export class MatchService {
       provider = providers[0];
     }
 
-    const options: ServerRequestOptions = {
+    const options: Server = {
       game: match.game,
       region: match.region,
       provider: provider,
-      closePref: {},
+      data: {
+        password: '*',
+        rconPassword: '*',
+        hatchElasticURL: '',
+        servername: 'Cytokine Match',
+        closeMinPlayers: match.players.length,
+        closeIdleTime: 300,
+      },
     };
 
     try {
@@ -295,7 +303,10 @@ export class MatchService {
     if (match.status === MatchStatus.CREATING_SERVER) {
       if (status === ServerStatus.IDLE || status === ServerStatus.RUNNING) {
         await this.updateStatusAndNotify(match, MatchStatus.WAITING);
-      } else if (status === ServerStatus.FAILED) {
+      } else if (
+        status === ServerStatus.CLOSED ||
+        status === ServerStatus.FAILED
+      ) {
         await this.updateStatusAndNotify(match, MatchStatus.FAILED);
       }
     }
@@ -319,10 +330,8 @@ export class MatchService {
   /**
    * Send a server creation request to lighthouse
    */
-  static async sendServerCreateRequest(
-    options: ServerRequestOptions,
-  ): Promise<any> {
-    options.callbackUrl = `${config.localhost}/api/v1/matches/server/callback`;
+  static async sendServerCreateRequest(options: Server): Promise<any> {
+    options.data.callbackUrl = `${config.localhost}/api/v1/matches/server/callback`;
     const res = await axios.post(
       `${config.lighthouse.host}/api/v1/servers`,
       options,
@@ -335,13 +344,36 @@ export class MatchService {
     return res.data;
   }
 
+  /**
+   * Get server info from lighthouse
+   */
+  async getServerInfo(client: Client, id: string): Promise<any> {
+    const match = await this.getById(id);
+
+    if (!match) {
+      throw new NotFoundException();
+    }
+
+    if (!match.server) {
+      throw new NotFoundException();
+    }
+
+    const url = `${config.lighthouse.host}/api/v1/servers/${match.server}`;
+    const res = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${config.lighthouse.clientSecret}`,
+      },
+    });
+    return res.data;
+  }
+
   async monitor() {
     const readyMatches = await this.repository.find({
       status: MatchStatus.LOBBY_READY,
     });
 
     this.logger.debug(
-      `Found ${readyMatches.length} lobbies that are waiting for players...`,
+      `Found ${readyMatches.length} matches that has their lobby ready...`,
     );
 
     for (const match of readyMatches) {

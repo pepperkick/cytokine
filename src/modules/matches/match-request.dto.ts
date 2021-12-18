@@ -7,6 +7,7 @@ import {
   IsNumber,
   Min,
   Max,
+  IsObject,
 } from 'class-validator';
 import { Game } from '../../objects/game.enum';
 import { Player } from './match-player.interfaace';
@@ -33,4 +34,10 @@ export class MatchRequestDto {
   @Min(2)
   @Max(20)
   requiredPlayers?: number;
+
+  @IsObject()
+  @IsOptional()
+  preference?: {
+    lighthouseProvider?: string;
+  };
 }

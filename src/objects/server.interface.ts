@@ -11,35 +11,57 @@ export enum ServerStatus {
 }
 
 export interface Server {
-  _id: string;
-  client: string;
-  provider: string;
-  callbackUrl?: string;
-  region: string;
+  _id?: string;
+  client?: string;
   game: string;
-  createdAt: Date;
-  status: ServerStatus;
-  closePref: {
-    minPlayers: number;
-    idleTime: number;
-  };
-  password: string;
-  rconPassword: string;
-  ip: string;
-  port: number;
-  tvPort: number;
+  createdAt?: Date;
   closeAt?: Date;
-}
-
-export interface ServerRequestOptions {
-  game: string;
+  ip?: string;
+  port?: number;
   region: string;
   provider: string;
-  data?: any;
-  callbackUrl?: string;
-  closePref?: {
-    minPlayers?: number;
-    idleTime?: number;
-    waitTime?: number;
+  image?: string;
+  status?: ServerStatus;
+  data: {
+    // For TF2, Valheim
+    password?: string;
+
+    // For TF2
+    servername?: string;
+    rconPassword?: string;
+    sdrEnable?: boolean;
+    sdrIp?: string;
+    sdrPort?: number;
+    sdrTvPort?: number;
+    tvEnable?: boolean;
+    tvPassword?: string;
+    tvPort?: number;
+    tvName?: string;
+    map?: string;
+
+    // For Minecraft
+    rconPort?: number;
+
+    // For Valheim
+    world?: string;
+
+    // For Status Updates
+    callbackUrl?: string;
+
+    // For Auto Close
+    closeMinPlayers?: number;
+    closeIdleTime?: number;
+    closeWaitTime?: number;
+
+    // For Git Repository
+    gitRepository?: string;
+    gitDeployKey?: string;
+
+    // For Hatch
+    hatchAddress?: string;
+    hatchPassword?: string;
+    hatchElasticURL?: string;
+    hatchElasticChatIndex?: string;
+    hatchElasticLogsIndex?: string;
   };
 }
