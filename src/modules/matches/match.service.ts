@@ -1,26 +1,14 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  HttpException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { Model } from 'mongoose';
-import { InjectModel } from '@nestjs/mongoose';
-import { Match } from './match.model';
-import { Client } from '../clients/client.model';
-import { MatchStatus } from './match-status.enum';
-import { Game } from '../../objects/game.enum';
-import { Player } from './match-player.interfaace';
-import { MatchRequestDto } from './match-request.dto';
-import { PlayerJoinRequestDto } from './player-join-request.dto';
-import axios from 'axios';
-import * as config from '../../../config.json';
-import {
-  Server,
-  ServerRequestOptions,
-  ServerStatus,
-} from '../../objects/server.interface';
+import { BadRequestException, ForbiddenException, HttpException, Logger, NotFoundException } from "@nestjs/common";
+import { Model } from "mongoose";
+import { InjectModel } from "@nestjs/mongoose";
+import { Match } from "./match.model";
+import { Client } from "../clients/client.model";
+import { MatchStatus } from "./match-status.enum";
+import { MatchRequestDto } from "./match-request.dto";
+import { PlayerJoinRequestDto } from "./player-join-request.dto";
+import axios from "axios";
+import * as config from "../../../config.json";
+import { Server, ServerRequestOptions, ServerStatus } from "../../objects/server.interface";
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
@@ -33,7 +21,7 @@ export class MatchService {
   constructor(@InjectModel(Match.name) private repository: Model<Match>) {
     if (config.monitoring.enabled === true) {
       setInterval(async () => {
-        // await this.monitor();
+        await this.monitor();
       }, config.monitoring.interval * 1000);
     }
   }
@@ -244,20 +232,28 @@ export class MatchService {
   async createServerForMatch(match: Match) {
     await this.updateStatusAndNotify(match, MatchStatus.CREATING_SERVER);
 
-    const providers = await MatchService.getAvailableRegionProvider(
-      match.region,
-    );
-    if (providers.length === 0) {
-      await this.updateStatusAndNotify(match, MatchStatus.FAILED);
-      throw new Error(
-        `Cannot create server for match ${match._id} as there are no available provider in region ${match.region}`,
+    let provider = "";
+    if (match.preferences.lighthouseProvider) {
+      provider = match.preferences.lighthouseProvider
+    } else {
+      const providers = await MatchService.getAvailableRegionProvider(
+        match.region,
       );
+
+      if (providers.length === 0) {
+        await this.updateStatusAndNotify(match, MatchStatus.FAILED);
+        throw new Error(
+          `Cannot create server for match ${match._id} as there are no available provider in region ${match.region}`,
+        );
+      }
+
+      provider = providers[0];
     }
 
     const options: ServerRequestOptions = {
       game: match.game,
       region: match.region,
-      provider: providers[0],
+      provider: provider,
       closePref: {},
     };
 
@@ -327,5 +323,29 @@ export class MatchService {
       },
     );
     return res.data;
+  }
+
+  async monitor() {
+    const readyMatches = await this.repository.find({
+      status: MatchStatus.LOBBY_READY,
+    });
+
+    this.logger.debug(
+      `Found ${readyMatches.length} lobbies that are waiting for players...`,
+    );
+
+    for (const match of readyMatches) {
+      setTimeout(async () => {
+        await this.processMatch(match);
+      }, 100);
+    }
+  }
+
+  async processMatch(match: Match) {
+    if (match.preferences.createLighthouseServer) {
+      this.logger.log(`Requesting server for match ${match._id}`);
+      await match.updateStatus(MatchStatus.CREATING_SERVER);
+      await this.createServerForMatch(match);
+    }
   }
 }

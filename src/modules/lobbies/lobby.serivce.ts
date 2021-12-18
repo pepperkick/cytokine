@@ -9,6 +9,7 @@ import { LobbyRequestDto } from './lobby-request.dto';
 import { PlayerJoinRequestDto } from './player-join-request.dto';
 import { LobbyStatus } from './lobby-status.enum';
 import { DistributorService } from "../distributor/distributor.service";
+import { MatchStatus } from "../matches/match-status.enum";
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -396,5 +397,10 @@ export class LobbyService {
 
     this.logger.log(`Lobby ${lobby._id} has been distributed!`);
     this.logger.debug(lobby);
+
+    const match = await this.matchService.getById(lobby.match);
+    match.players = lobby.queuedPlayers;
+    await match.save();
+    await match.updateStatus(MatchStatus.LOBBY_READY);
   }
 }
