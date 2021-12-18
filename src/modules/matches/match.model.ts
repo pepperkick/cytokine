@@ -3,10 +3,10 @@ import { Document } from 'mongoose';
 import { Game } from '../../objects/game.enum';
 import { Player } from './match-player.interfaace';
 import { MatchStatus } from './match-status.enum';
-import { Logger } from "@nestjs/common";
-import { LobbyStatus } from "../lobbies/lobby-status.enum";
-import axios from "axios";
-import { Lobby, LobbySchema } from "../lobbies/lobby.model";
+import { Logger } from '@nestjs/common';
+import { LobbyStatus } from '../lobbies/lobby-status.enum';
+import axios from 'axios';
+import { Lobby, LobbySchema } from '../lobbies/lobby.model';
 
 @Schema()
 export class Match extends Document {
@@ -38,27 +38,30 @@ export class Match extends Document {
   preferences: {
     requiredPlayers?: number;
     createLighthouseServer?: boolean;
-    lighthouseProvider?: string
+    lighthouseProvider?: string;
   };
 
-  updateStatus: (status: MatchStatus, data?: any) => void
-  notify: (data?: any) => void
+  updateStatus: (status: MatchStatus, data?: any) => void;
+  notify: (data?: any) => void;
 }
 
 export const MatchSchema = SchemaFactory.createForClass(Match);
 
 const logger = new Logger(Match.name);
 
-MatchSchema.methods.updateStatus = async function(status: MatchStatus, data: any = {}) {
-  this.status = status
-  await this.save()
+MatchSchema.methods.updateStatus = async function (
+  status: MatchStatus,
+  data: any = {},
+) {
+  this.status = status;
+  await this.save();
   await this.notify({
     ...this.toJSON(),
     ...data,
-  })
-}
+  });
+};
 
-MatchSchema.methods.notify = async function(data) {
+MatchSchema.methods.notify = async function (data) {
   if (this.callbackUrl) {
     logger.log(
       `Notifying URL '${this.callbackUrl}' for status '${this.status} (${this._id})'`,
@@ -68,12 +71,10 @@ MatchSchema.methods.notify = async function(data) {
       await axios.post(`${this.callbackUrl}?status=${this.status}`, data);
     } catch (error) {
       if (error.code === 'ECONNREFUSED') {
-        logger.warn(
-          `Failed to connect callback URL "${this.callbackUrl}"`,
-        );
+        logger.warn(`Failed to connect callback URL "${this.callbackUrl}"`);
       } else {
         logger.error('Failed to notify callback URL', error);
       }
     }
   }
-}
+};

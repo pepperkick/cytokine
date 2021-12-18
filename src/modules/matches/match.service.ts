@@ -1,14 +1,24 @@
-import { BadRequestException, ForbiddenException, HttpException, Logger, NotFoundException } from "@nestjs/common";
-import { Model } from "mongoose";
-import { InjectModel } from "@nestjs/mongoose";
-import { Match } from "./match.model";
-import { Client } from "../clients/client.model";
-import { MatchStatus } from "./match-status.enum";
-import { MatchRequestDto } from "./match-request.dto";
-import { PlayerJoinRequestDto } from "./player-join-request.dto";
-import axios from "axios";
-import * as config from "../../../config.json";
-import { Server, ServerRequestOptions, ServerStatus } from "../../objects/server.interface";
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Match } from './match.model';
+import { Client } from '../clients/client.model';
+import { MatchStatus } from './match-status.enum';
+import { MatchRequestDto } from './match-request.dto';
+import { PlayerJoinRequestDto } from './player-join-request.dto';
+import axios from 'axios';
+import * as config from '../../../config.json';
+import {
+  Server,
+  ServerRequestOptions,
+  ServerStatus,
+} from '../../objects/server.interface';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
@@ -232,9 +242,9 @@ export class MatchService {
   async createServerForMatch(match: Match) {
     await this.updateStatusAndNotify(match, MatchStatus.CREATING_SERVER);
 
-    let provider = "";
+    let provider = '';
     if (match.preferences.lighthouseProvider) {
-      provider = match.preferences.lighthouseProvider
+      provider = match.preferences.lighthouseProvider;
     } else {
       const providers = await MatchService.getAvailableRegionProvider(
         match.region,

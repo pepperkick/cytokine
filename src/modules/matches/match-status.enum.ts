@@ -1,7 +1,7 @@
 export enum MatchStatus {
   UNKNOWN = 'UNKNOWN', // Match is in unknown status
   WAITING_FOR_LOBBY = 'WAITING_FOR_LOBBY', // Waiting for required players to join the lobby
-  LOBBY_READY ='LOBBY_READY', // Lobby is ready
+  LOBBY_READY = 'LOBBY_READY', // Lobby is ready
   CREATING_SERVER = 'CREATING_SERVER', // Server for this match is being created
   WAITING = 'WAITING', // Waiting for players to join
   LIVE = 'LIVE', // Match is live

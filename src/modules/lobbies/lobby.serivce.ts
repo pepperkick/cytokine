@@ -8,8 +8,8 @@ import { MatchService } from '../matches/match.service';
 import { LobbyRequestDto } from './lobby-request.dto';
 import { PlayerJoinRequestDto } from './player-join-request.dto';
 import { LobbyStatus } from './lobby-status.enum';
-import { DistributorService } from "../distributor/distributor.service";
-import { MatchStatus } from "../matches/match-status.enum";
+import { DistributorService } from '../distributor/distributor.service';
+import { MatchStatus } from '../matches/match-status.enum';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -22,7 +22,7 @@ export class LobbyService {
   constructor(
     @InjectModel(Lobby.name) private repository: Model<Lobby>,
     private matchService: MatchService,
-    private distributorService: DistributorService
+    private distributorService: DistributorService,
   ) {
     if (config.monitoring.enabled === true) {
       setInterval(async () => {

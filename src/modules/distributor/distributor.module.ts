@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DistributorService } from "./distributor.service";
+import { DistributorService } from './distributor.service';
 
 @Module({
   providers: [DistributorService],
