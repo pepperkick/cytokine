@@ -13,12 +13,6 @@ export class PlayerJoinRequestDto {
   @IsNotEmpty()
   name: string;
 
-  @IsNumber()
-  @IsNotEmpty()
-  @Min(1)
-  @Max(5)
-  team: number;
-
   @IsString()
   @IsNotEmpty()
   @IsOptional()

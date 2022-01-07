@@ -160,6 +160,7 @@ export class MatchService {
       status: MatchStatus.WAITING_FOR_LOBBY,
       players: options.players || [],
       requiredPlayers: options.requiredPlayers,
+      format: options.format,
       preferences: {
         createLighthouseServer: true,
         lighthouseProvider: options.preference?.lighthouseProvider,

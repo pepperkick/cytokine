@@ -35,6 +35,9 @@ export class Match extends Document {
   players: Player[];
 
   @Prop({ type: Object })
+  format: unknown;
+
+  @Prop({ type: Object })
   preferences: {
     requiredPlayers?: number;
     createLighthouseServer?: boolean;

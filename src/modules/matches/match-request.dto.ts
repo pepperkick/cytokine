@@ -37,6 +37,10 @@ export class MatchRequestDto {
 
   @IsObject()
   @IsOptional()
+  format?: unknown;
+
+  @IsObject()
+  @IsOptional()
   preference?: {
     lighthouseProvider?: string;
   };
