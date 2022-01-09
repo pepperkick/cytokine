@@ -98,8 +98,8 @@ export class MatchesController {
   async serverInfo(
     @Req() request: RequestWithClient,
     @Param('id') id: string,
-  ): Promise<Match> {
-    return this.service.getServerInfo(request.client, id);
+  ): Promise<Server> {
+    return this.service.getServerInfo(id);
   }
 
   /**

@@ -12,9 +12,10 @@ import { Client } from '../clients/client.model';
 import { MatchStatus } from './match-status.enum';
 import { MatchRequestDto } from './match-request.dto';
 import { PlayerJoinRequestDto } from './player-join-request.dto';
+import { Server, ServerStatus } from '../../objects/server.interface';
+import { query } from 'gamedig';
 import axios from 'axios';
 import * as config from '../../../config.json';
-import { Server, ServerStatus } from '../../objects/server.interface';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
@@ -303,12 +304,19 @@ export class MatchService {
 
     if (match.status === MatchStatus.CREATING_SERVER) {
       if (status === ServerStatus.IDLE || status === ServerStatus.RUNNING) {
-        await this.updateStatusAndNotify(match, MatchStatus.WAITING);
+        await this.updateStatusAndNotify(
+          match,
+          MatchStatus.WAITING_FOR_PLAYERS,
+        );
       } else if (
         status === ServerStatus.CLOSED ||
         status === ServerStatus.FAILED
       ) {
         await this.updateStatusAndNotify(match, MatchStatus.FAILED);
+      }
+    } else if (match.status === MatchStatus.LIVE) {
+      if (status === ServerStatus.CLOSED || status === ServerStatus.FAILED) {
+        await this.updateStatusAndNotify(match, MatchStatus.FINISHED);
       }
     }
   }
@@ -348,7 +356,7 @@ export class MatchService {
   /**
    * Get server info from lighthouse
    */
-  async getServerInfo(client: Client, id: string): Promise<any> {
+  async getServerInfo(id: string): Promise<Server> {
     const match = await this.getById(id);
 
     if (!match) {
@@ -368,7 +376,11 @@ export class MatchService {
     return res.data;
   }
 
+  /**
+   * Monitor all matches for status changes
+   */
   async monitor() {
+    // Check for lobby ready matches
     const readyMatches = await this.repository.find({
       status: MatchStatus.LOBBY_READY,
     });
@@ -382,13 +394,54 @@ export class MatchService {
         await this.processMatch(match);
       }, 100);
     }
+
+    // Check for waiting for player matches
+    const waitingForPlayersMatches = await this.repository.find({
+      status: MatchStatus.WAITING_FOR_PLAYERS,
+    });
+
+    this.logger.debug(
+      `Found ${readyMatches.length} matches that are waiting for players...`,
+    );
+
+    for (const match of waitingForPlayersMatches) {
+      setTimeout(async () => {
+        await this.monitorMatch(match);
+      }, 100);
+    }
   }
 
+  /**
+   * Process the match that has its lobby ready
+   *
+   * @param match
+   */
   async processMatch(match: Match) {
     if (match.preferences.createLighthouseServer) {
       this.logger.log(`Requesting server for match ${match._id}`);
       await match.updateStatus(MatchStatus.CREATING_SERVER);
       await this.createServerForMatch(match);
+    }
+  }
+
+  /**
+   * Monitor the match server to see if players have joined
+   *
+   * @param match
+   */
+  async monitorMatch(match: Match) {
+    const server = await this.getServerInfo(match.id);
+
+    // Query the server to see if players have joined
+    const data = await query({
+      host: server.ip,
+      port: server.port,
+      type: 'tf2',
+    });
+
+    if (data.players.length >= match.players.length) {
+      this.logger.log(`Enough players have joined match ${match._id}`);
+      await match.updateStatus(MatchStatus.LIVE);
     }
   }
 }
