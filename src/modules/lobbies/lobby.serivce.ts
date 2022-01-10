@@ -125,6 +125,7 @@ export class LobbyService {
       client,
       options.matchOptions,
     );
+
     const lobby = new this.repository({
       match: match._id,
       client: client.id,
@@ -133,6 +134,7 @@ export class LobbyService {
       createdAt: new Date(),
       requirements: options.requirements,
       queuedPlayers: options.queuedPlayers || [],
+      maxPlayers: options.matchOptions.requiredPlayers,
       callbackUrl: options.callbackUrl || '',
     });
     await lobby.save();
