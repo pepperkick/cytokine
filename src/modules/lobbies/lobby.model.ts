@@ -35,6 +35,9 @@ export class Lobby extends Document {
   @Prop({ type: Object })
   requirements: RoleRequirement[];
 
+  @Prop({ type: Number })
+  maxPlayers: number;
+
   @Prop({ type: Object })
   data: {};
 
