@@ -42,6 +42,7 @@ export class MatchRequestDto {
   @IsObject()
   @IsOptional()
   preference?: {
+    createLighthouseServer?: boolean;
     lighthouseProvider?: string;
   };
 }

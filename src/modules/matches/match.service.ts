@@ -163,7 +163,8 @@ export class MatchService {
       requiredPlayers: options.requiredPlayers,
       format: options.format,
       preferences: {
-        createLighthouseServer: true,
+        createLighthouseServer:
+          options.preference?.createLighthouseServer || true,
         lighthouseProvider: options.preference?.lighthouseProvider,
       },
     });
@@ -421,6 +422,8 @@ export class MatchService {
       this.logger.log(`Requesting server for match ${match._id}`);
       await match.updateStatus(MatchStatus.CREATING_SERVER);
       await this.createServerForMatch(match);
+    } else {
+      await match.updateStatus(MatchStatus.LIVE);
     }
   }
 
