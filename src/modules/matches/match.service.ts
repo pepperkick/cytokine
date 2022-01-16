@@ -163,8 +163,7 @@ export class MatchService {
       requiredPlayers: options.requiredPlayers,
       format: options.format,
       preferences: {
-        createLighthouseServer:
-          options.preference?.createLighthouseServer || true,
+        createLighthouseServer: options.preference?.createLighthouseServer,
         lighthouseProvider: options.preference?.lighthouseProvider,
       },
     });
