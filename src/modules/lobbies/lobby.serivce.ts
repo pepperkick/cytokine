@@ -34,7 +34,7 @@ export class LobbyService {
   /**
    * Get lobby by id
    *
-   * @param id - Match ID
+   * @param id - Lobby ID
    */
   async getById(id: string): Promise<Lobby> {
     let object;
@@ -54,7 +54,7 @@ export class LobbyService {
    * Get lobby by id from specific client
    *
    * @param client - Client Object
-   * @param id - Match ID
+   * @param id - Lobby ID
    */
   async getByIdForClient(client: Client, id: string): Promise<Lobby> {
     let object;
@@ -79,6 +79,16 @@ export class LobbyService {
    */
   async getAllByClient(client: Client): Promise<Lobby[]> {
     return this.repository.find({ client: client.id }).limit(50);
+  }
+
+  /**
+   * Get a lobby by match ID
+   * @param client The client querying for the lobby
+   * @param id Match ID
+   * @returns 
+   */
+  async getByMatchId(client: Client, id: string): Promise<Lobby> {
+    return this.repository.findOne({ match: id });
   }
 
   /**

@@ -64,6 +64,18 @@ export class LobbiesController {
   }
 
   /**
+   * Get lobby info by match id
+   */
+  @Get('/match/:id')
+  @UseGuards(ClientGuard)
+  async getByMatchId(
+    @Req() request: RequestWithClient,
+    @Param('id') matchId: string,
+  ): Promise<Lobby> {
+    return this.service.getByMatchId(request.client, matchId);
+  }
+
+  /**
    * Add a player to the lobby
    */
   @Post('/:id/join')
