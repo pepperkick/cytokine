@@ -434,16 +434,20 @@ export class MatchService {
   async monitorMatch(match: Match) {
     const server = await this.getServerInfo(match.id);
 
-    // Query the server to see if players have joined
-    const data = await query({
-      host: server.ip,
-      port: server.port,
-      type: 'tf2',
-    });
+    try {
+      // Query the server to see if players have joined
+      const data = await query({
+        host: server.ip,
+        port: server.port,
+        type: 'tf2',
+      });
 
-    if (data.players.length >= match.players.length) {
-      this.logger.log(`Enough players have joined match ${match._id}`);
-      await match.updateStatus(MatchStatus.LIVE);
+      if (data.players.length >= match.players.length) {
+        this.logger.log(`Enough players have joined match ${match._id}`);
+        await match.updateStatus(MatchStatus.LIVE);
+      }
+    } catch (e) {
+      this.logger.error(`Failed to query match '${match.id}': ${e}`);
     }
   }
 }
