@@ -85,7 +85,7 @@ export class LobbyService {
    * Get a lobby by match ID
    * @param client The client querying for the lobby
    * @param id Match ID
-   * @returns 
+   * @returns
    */
   async getByMatchId(client: Client, id: string): Promise<Lobby> {
     return this.repository.findOne({ match: id });
