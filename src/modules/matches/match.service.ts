@@ -19,6 +19,7 @@ import * as config from '../../../config.json';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
+  { status: MatchStatus.WAITING_FOR_PLAYERS },
   { status: MatchStatus.LOBBY_READY },
   { status: MatchStatus.CREATING_SERVER },
   { status: MatchStatus.LIVE },
@@ -235,6 +236,47 @@ export class MatchService {
     }
 
     await match.save();
+  }
+
+  /**
+   * Close a match by changing its status to CLOSED.
+   * @param match The Match ID
+   */
+  async close(matchId: string): Promise<Match> {
+    // Get the Match document (must not be already CLOSED, FINISHED or FAILED)
+    const match: Match = await this.repository.findOne({
+      _id: matchId,
+      status: {
+        $nin: [MatchStatus.CLOSED, MatchStatus.FINISHED, MatchStatus.FAILED],
+      },
+    });
+
+    // If the match wasn't found...
+    if (!match) return match;
+
+    // Send the request to Lighthouse to close the server (if any)
+    if (match.server) {
+      try {
+        await axios.delete(
+          `${config.lighthouse.host}/api/v1/servers/${match.server}`,
+          {
+            headers: {
+              Authorization: `Bearer ${config.lighthouse.clientSecret}`,
+            },
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to close server '${match.server}' from match '${match._id}': ${error}`,
+        );
+      }
+    }
+
+    // Send the status update on the closed server to Regi-Cytokine
+    await this.updateStatusAndNotify(match, MatchStatus.CLOSED);
+
+    // Save the match object
+    return await match.save();
   }
 
   /**
