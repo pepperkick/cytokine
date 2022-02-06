@@ -22,6 +22,10 @@ export class MatchRequestDto {
   @IsNotEmpty()
   region: string;
 
+  @IsString()
+  @IsNotEmpty()
+  map: string;
+
   @IsOptional()
   callbackUrl?: string;
 

@@ -122,7 +122,7 @@ export class MatchService {
     client: Client,
     options: MatchRequestDto,
   ): Promise<Match> {
-    const { game, region, callbackUrl } = options;
+    const { game, region, callbackUrl, map } = options;
 
     this.logger.log(
       `Received new match request from client '${client.id}' at region '${region}' for game '${game}'`,
@@ -159,6 +159,7 @@ export class MatchService {
       callbackUrl,
       region,
       game,
+      map,
       status: MatchStatus.WAITING_FOR_LOBBY,
       players: options.players || [],
       requiredPlayers: options.requiredPlayers,
@@ -310,6 +311,7 @@ export class MatchService {
       region: match.region,
       provider: provider,
       data: {
+        map: match.map,
         password: '*',
         rconPassword: '*',
         hatchElasticURL: '',
