@@ -14,6 +14,7 @@ import { MatchStatus } from '../matches/match-status.enum';
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
   { status: LobbyStatus.DISTRIBUTING },
+  { status: LobbyStatus.DISTRIBUTED },
 ];
 
 export class LobbyService {
@@ -150,6 +151,41 @@ export class LobbyService {
     await lobby.save();
 
     return lobby;
+  }
+
+  /**
+   * Initiates the closing process of a Lobby.
+   * @param client The client that initiated the lobby close.
+   * @param id The ID of the Lobby we're closing.
+   * @returns The newly updated Lobby document.
+   */
+  async close(client: Client, id: string): Promise<Lobby> {
+    // TODO: Verify client has access to close this lobby
+    // Will do this once the closing logic is finished and start working on 1:1 restrictions
+    //
+    // Get the Lobby document we're closing.
+    const lobby: Lobby = await this.repository.findOne({
+      _id: id,
+      $or: LOBBY_ACTIVE_STATUS_CONDITION,
+    });
+
+    // If the Lobby is already closed, return the Lobby.
+    if (!lobby) return lobby;
+
+    try {
+      // Close the match as well
+      const { status } = await this.matchService.close(lobby.match);
+
+      if (status === MatchStatus.CLOSED) {
+        // Begin closing the Lobby (this will also notify Regi-Cytokine)
+        lobby.updateStatus(LobbyStatus.CLOSED);
+
+        // Return the updated Lobby
+        return lobby;
+      }
+    } catch (e) {
+      this.logger.error(`Failed to close lobby '${id}': ${e}`);
+    }
   }
 
   /**

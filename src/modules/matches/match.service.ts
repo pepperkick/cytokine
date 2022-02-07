@@ -22,7 +22,6 @@ export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_PLAYERS },
   { status: MatchStatus.LOBBY_READY },
   { status: MatchStatus.CREATING_SERVER },
-  { status: MatchStatus.LIVE },
 ];
 
 export class MatchService {
@@ -244,12 +243,10 @@ export class MatchService {
    * @param match The Match ID
    */
   async close(matchId: string): Promise<Match> {
-    // Get the Match document (must not be already CLOSED, FINISHED or FAILED)
+    // Get the Match document (must be ACTIVE)
     const match: Match = await this.repository.findOne({
       _id: matchId,
-      status: {
-        $nin: [MatchStatus.CLOSED, MatchStatus.FINISHED, MatchStatus.FAILED],
-      },
+      $or: MATCH_ACTIVE_STATUS_CONDITION,
     });
 
     // If the match wasn't found...
@@ -273,8 +270,8 @@ export class MatchService {
       }
     }
 
-    // Send the status update on the closed server to Regi-Cytokine
-    await this.updateStatusAndNotify(match, MatchStatus.CLOSED);
+    // Update the status of the match
+    match.status = MatchStatus.CLOSED;
 
     // Save the match object
     return await match.save();
