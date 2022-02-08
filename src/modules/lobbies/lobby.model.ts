@@ -38,6 +38,9 @@ export class Lobby extends Document {
   @Prop({ type: Number })
   maxPlayers: number;
 
+  @Prop({ type: String })
+  createdBy: string;
+
   @Prop({ type: Object })
   data: {};
 

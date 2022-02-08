@@ -35,6 +35,10 @@ export class LobbyRequestDto {
   @Type(() => MatchRequestDto)
   matchOptions: MatchRequestDto;
 
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
   @IsOptional()
   callbackUrl: string;
 }
