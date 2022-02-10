@@ -184,6 +184,7 @@ export class LobbyService {
     const lobby = new this.repository({
       match: match._id,
       client: client.id,
+      name: options.name,
       status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
       distribution: options.distribution,
       createdAt: new Date(),

@@ -39,6 +39,10 @@ export class LobbyRequestDto {
   @IsNotEmpty()
   userId: string;
 
+  @IsString()
+  @IsOptional()
+  name: string;
+
   @IsOptional()
   callbackUrl: string;
 }

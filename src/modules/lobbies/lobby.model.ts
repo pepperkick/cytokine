@@ -15,6 +15,9 @@ export class Lobby extends Document {
   createdAt: Date;
 
   @Prop()
+  name: string;
+
+  @Prop()
   match: string;
 
   @Prop({ type: String, required: true })
