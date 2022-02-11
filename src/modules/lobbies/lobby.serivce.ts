@@ -1,4 +1,10 @@
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as config from '../../../config.json';
@@ -10,6 +16,7 @@ import { PlayerJoinRequestDto } from './player-join-request.dto';
 import { LobbyStatus } from './lobby-status.enum';
 import { DistributorService } from '../distributor/distributor.service';
 import { MatchStatus } from '../matches/match-status.enum';
+import { LobbyModule } from './lobby.module';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -22,7 +29,7 @@ export class LobbyService {
 
   constructor(
     @InjectModel(Lobby.name) private repository: Model<Lobby>,
-    private matchService: MatchService,
+    @Inject(forwardRef(() => MatchService)) private matchService: MatchService,
     private distributorService: DistributorService,
   ) {
     if (config.monitoring.enabled === true) {
@@ -84,11 +91,10 @@ export class LobbyService {
 
   /**
    * Get a lobby by match ID
-   * @param client The client querying for the lobby
    * @param id Match ID
    * @returns
    */
-  async getByMatchId(client: Client, id: string): Promise<Lobby> {
+  async getByMatchId(id: string): Promise<Lobby> {
     return this.repository.findOne({ match: id });
   }
 

@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
   HttpException,
+  Inject,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,6 +18,8 @@ import { Server, ServerStatus } from '../../objects/server.interface';
 import { query } from 'gamedig';
 import axios from 'axios';
 import * as config from '../../../config.json';
+import { LobbyService } from '../lobbies/lobby.serivce';
+import { LobbyStatus } from '../lobbies/lobby-status.enum';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
@@ -27,7 +31,10 @@ export const MATCH_ACTIVE_STATUS_CONDITION = [
 export class MatchService {
   private readonly logger = new Logger(MatchService.name);
 
-  constructor(@InjectModel(Match.name) private repository: Model<Match>) {
+  constructor(
+    @InjectModel(Match.name) private repository: Model<Match>,
+    @Inject(forwardRef(() => LobbyService)) private lobbyService: LobbyService,
+  ) {
     if (config.monitoring.enabled === true) {
       setInterval(async () => {
         await this.monitor();
@@ -239,6 +246,22 @@ export class MatchService {
   }
 
   /**
+   * Update the status of a match and notify the callback url if it is present
+   *
+   * @param match
+   * @param status
+   * @param data
+   */
+  async updateLobbyStatusAndNotify(
+    match: Match,
+    status: LobbyStatus,
+    data: any = {},
+  ): Promise<void> {
+    const lobby = await this.lobbyService.getByMatchId(match._id);
+    await lobby.updateStatus(status, data);
+  }
+
+  /**
    * Close a match by changing its status to CLOSED.
    * @param match The Match ID
    */
@@ -295,6 +318,7 @@ export class MatchService {
 
       if (providers.length === 0) {
         await this.updateStatusAndNotify(match, MatchStatus.FAILED);
+        await this.updateLobbyStatusAndNotify(match, LobbyStatus.CLOSED);
         throw new Error(
           `Cannot create server for match ${match._id} as there are no available provider in region ${match.region}`,
         );
@@ -325,6 +349,7 @@ export class MatchService {
     } catch (error) {
       this.logger.error('Failed to create server', error);
       await this.updateStatusAndNotify(match, MatchStatus.FAILED);
+      await this.updateLobbyStatusAndNotify(match, LobbyStatus.CLOSED);
     }
   }
 
@@ -354,6 +379,7 @@ export class MatchService {
         status === ServerStatus.FAILED
       ) {
         await this.updateStatusAndNotify(match, MatchStatus.FAILED);
+        await this.updateLobbyStatusAndNotify(match, LobbyStatus.CLOSED);
       }
     } else if (
       match.status === MatchStatus.LIVE ||
@@ -361,6 +387,7 @@ export class MatchService {
     ) {
       if (status === ServerStatus.CLOSED || status === ServerStatus.FAILED) {
         await this.updateStatusAndNotify(match, MatchStatus.FINISHED);
+        await this.updateLobbyStatusAndNotify(match, LobbyStatus.CLOSED);
       }
     }
   }

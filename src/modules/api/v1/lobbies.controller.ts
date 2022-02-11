@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -85,7 +86,13 @@ export class LobbiesController {
     @Req() request: RequestWithClient,
     @Param('id') matchId: string,
   ): Promise<Lobby> {
-    return this.service.getByMatchId(request.client, matchId);
+    const lobby = await this.service.getByMatchId(matchId);
+
+    if (lobby.client !== request.client.id) {
+      throw new NotFoundException();
+    }
+
+    return lobby;
   }
 
   /**
