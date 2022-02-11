@@ -22,6 +22,9 @@ export class Match extends Document {
   @Prop({ type: String, required: true })
   game: Game;
 
+  @Prop({ type: String, required: true })
+  map: string;
+
   @Prop()
   callbackUrl: string;
 

@@ -71,8 +71,8 @@ export class MatchesController {
   async delete(
     @Req() request: RequestWithClient,
     @Param('id') id: string,
-  ): Promise<void> {
-    // TODO: Close match
+  ): Promise<Match> {
+    return this.service.close(id);
   }
 
   /**

@@ -14,6 +14,7 @@ import { MatchStatus } from '../matches/match-status.enum';
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
   { status: LobbyStatus.DISTRIBUTING },
+  { status: LobbyStatus.DISTRIBUTED },
 ];
 
 export class LobbyService {
@@ -104,6 +105,22 @@ export class LobbyService {
   }
 
   /**
+   * Get active lobbies created by a certain Discord user
+   * @param id The Discord user ID
+   * @returns The lobbies created by the user.
+   */
+  async getAllActiveByUser(id: string): Promise<Lobby[]> {
+    const res = await this.repository.find({
+      createdBy: id,
+      $or: LOBBY_ACTIVE_STATUS_CONDITION,
+    });
+
+    console.log(res);
+
+    return res;
+  }
+
+  /**
    * Get all lobbies
    */
   async getAll(): Promise<Lobby[]> {
@@ -115,6 +132,18 @@ export class LobbyService {
    */
   async getAllActive(): Promise<Lobby[]> {
     return this.repository.find({ $or: LOBBY_ACTIVE_STATUS_CONDITION });
+  }
+
+  /**
+   * Gets active lobbies where the player is queued in.
+   * @param id The Discord ID of the user we're searching for
+   * @returns The Lobby(s) the user is queued in.
+   */
+  async getQueuedInLobby(id: string): Promise<Lobby[]> {
+    return this.repository.find({
+      queuedPlayers: { $elemMatch: { discord: id } },
+      $or: LOBBY_ACTIVE_STATUS_CONDITION,
+    });
   }
 
   /**
@@ -131,17 +160,35 @@ export class LobbyService {
       options.matchOptions.callbackUrl = options.callbackUrl;
     }
 
+    // Do not allow creation if user already has created lobbies
+    if ((await this.getAllActiveByUser(options.userId)).length > 0)
+      throw new BadRequestException({
+        error: true,
+        message: `You've already created one lobby!`,
+      });
+
+    // Do not allow creation if user is already queued in a lobby
+    if ((await this.getQueuedInLobby(options.userId)).length > 0)
+      throw new BadRequestException({
+        error: true,
+        message: `You're already queued in a lobby! Unqueue to create a new one.`,
+      });
+
+    // Create the Match document with the match options
     const match = await this.matchService.createRequest(
       client,
       options.matchOptions,
     );
 
+    // Create the Lobby document
     const lobby = new this.repository({
       match: match._id,
       client: client.id,
+      name: options.name,
       status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
       distribution: options.distribution,
       createdAt: new Date(),
+      createdBy: options.userId,
       requirements: options.requirements,
       queuedPlayers: options.queuedPlayers || [],
       maxPlayers: options.matchOptions.requiredPlayers,
@@ -150,6 +197,41 @@ export class LobbyService {
     await lobby.save();
 
     return lobby;
+  }
+
+  /**
+   * Initiates the closing process of a Lobby.
+   * @param client The client that initiated the lobby close.
+   * @param id The ID of the Lobby we're closing.
+   * @returns The newly updated Lobby document.
+   */
+  async close(client: Client, id: string): Promise<Lobby> {
+    // TODO: Verify client has access to close a lobby
+    // Will do this once the closing logic is finished and start working on 1:1 restrictions
+    //
+    // Get the Lobby document we're closing.
+    const lobby: Lobby = await this.repository.findOne({
+      _id: id,
+      $or: LOBBY_ACTIVE_STATUS_CONDITION,
+    });
+
+    // If the Lobby is already closed, return the Lobby.
+    if (!lobby) return lobby;
+
+    try {
+      // Close the match as well
+      const { status } = await this.matchService.close(lobby.match);
+
+      if (status === MatchStatus.CLOSED) {
+        // Begin closing the Lobby (this will also notify Regi-Cytokine)
+        lobby.updateStatus(LobbyStatus.CLOSED);
+
+        // Return the updated Lobby
+        return lobby;
+      }
+    } catch (e) {
+      this.logger.error(`Failed to close lobby '${id}': ${e}`);
+    }
   }
 
   /**
@@ -166,10 +248,20 @@ export class LobbyService {
   ): Promise<Lobby> {
     // TODO: Verify client has access to this lobby
 
+    // If the user is already queued in another lobby do not allow them
+    if ((await this.getQueuedInLobby(player.discord)).length > 0)
+      throw new BadRequestException({
+        error: true,
+        message: `You're already queued in another lobby!`,
+      });
+
     const lobby = await this.getById(id);
 
     if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
-      throw new BadRequestException({ message: 'Cannot join this lobby' });
+      throw new BadRequestException({
+        error: true,
+        message: 'Cannot join this lobby',
+      });
     }
 
     lobby.queuedPlayers.push(player);

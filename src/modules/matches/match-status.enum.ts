@@ -7,5 +7,6 @@ export enum MatchStatus {
   WAITING_TO_START = 'WAITING_TO_START', // Waiting for players to start the match
   LIVE = 'LIVE', // Match is live
   FINISHED = 'FINISHED', // Match has finished
+  CLOSED = 'CLOSED', // Match has been forcefully closed by an admin/other
   FAILED = 'FAILED', // An error occurred during processing of the match
 }

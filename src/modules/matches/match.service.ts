@@ -19,9 +19,9 @@ import * as config from '../../../config.json';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
+  { status: MatchStatus.WAITING_FOR_PLAYERS },
   { status: MatchStatus.LOBBY_READY },
   { status: MatchStatus.CREATING_SERVER },
-  { status: MatchStatus.LIVE },
 ];
 
 export class MatchService {
@@ -121,7 +121,7 @@ export class MatchService {
     client: Client,
     options: MatchRequestDto,
   ): Promise<Match> {
-    const { game, region, callbackUrl } = options;
+    const { game, region, callbackUrl, map } = options;
 
     this.logger.log(
       `Received new match request from client '${client.id}' at region '${region}' for game '${game}'`,
@@ -158,6 +158,7 @@ export class MatchService {
       callbackUrl,
       region,
       game,
+      map,
       status: MatchStatus.WAITING_FOR_LOBBY,
       players: options.players || [],
       requiredPlayers: options.requiredPlayers,
@@ -238,6 +239,45 @@ export class MatchService {
   }
 
   /**
+   * Close a match by changing its status to CLOSED.
+   * @param match The Match ID
+   */
+  async close(matchId: string): Promise<Match> {
+    // Get the Match document (must be ACTIVE)
+    const match: Match = await this.repository.findOne({
+      _id: matchId,
+      $or: MATCH_ACTIVE_STATUS_CONDITION,
+    });
+
+    // If the match wasn't found...
+    if (!match) return match;
+
+    // Send the request to Lighthouse to close the server (if any)
+    if (match.server) {
+      try {
+        await axios.delete(
+          `${config.lighthouse.host}/api/v1/servers/${match.server}`,
+          {
+            headers: {
+              Authorization: `Bearer ${config.lighthouse.clientSecret}`,
+            },
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to close server '${match.server}' from match '${match._id}': ${error}`,
+        );
+      }
+    }
+
+    // Update the status of the match
+    match.status = MatchStatus.CLOSED;
+
+    // Save the match object
+    return await match.save();
+  }
+
+  /**
    * Create lighthouse server for the match
    *
    * @param match
@@ -268,6 +308,7 @@ export class MatchService {
       region: match.region,
       provider: provider,
       data: {
+        map: match.map,
         password: '*',
         rconPassword: '*',
         hatchElasticURL: '',
