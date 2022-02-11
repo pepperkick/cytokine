@@ -314,7 +314,10 @@ export class MatchService {
       ) {
         await this.updateStatusAndNotify(match, MatchStatus.FAILED);
       }
-    } else if (match.status === MatchStatus.LIVE) {
+    } else if (
+      match.status === MatchStatus.LIVE ||
+      match.status === MatchStatus.WAITING_FOR_PLAYERS
+    ) {
       if (status === ServerStatus.CLOSED || status === ServerStatus.FAILED) {
         await this.updateStatusAndNotify(match, MatchStatus.FINISHED);
       }
