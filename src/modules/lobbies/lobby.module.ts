@@ -1,7 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Lobby, LobbySchema } from './lobby.model';
-import { LobbyService } from './lobby.serivce';
+import { LobbyService } from './lobby.service';
 import { MatchModule } from '../matches/match.module';
 import { DistributorModule } from '../distributor/distributor.module';
 

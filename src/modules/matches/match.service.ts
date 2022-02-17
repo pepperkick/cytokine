@@ -18,7 +18,7 @@ import { Server, ServerStatus } from '../../objects/server.interface';
 import { query } from 'gamedig';
 import axios from 'axios';
 import * as config from '../../../config.json';
-import { LobbyService } from '../lobbies/lobby.serivce';
+import { LobbyService } from '../lobbies/lobby.service';
 import { LobbyStatus } from '../lobbies/lobby-status.enum';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [

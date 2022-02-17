@@ -12,7 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { LobbyService } from '../../lobbies/lobby.serivce';
+import { LobbyService } from '../../lobbies/lobby.service';
 import { ClientGuard } from './client.guard';
 import { RequestWithClient } from '../request-with-client.interface';
 import { Lobby } from '../../lobbies/lobby.model';
