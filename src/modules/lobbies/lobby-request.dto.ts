@@ -3,18 +3,13 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
-  IsNumber,
-  IsObject,
   IsOptional,
   IsString,
-  Max,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import { DistributionType } from '../../objects/distribution.enum';
 import { Player } from '../matches/match-player.interfaace';
 import { RoleRequirement } from '../../objects/role.interface';
-import { Game } from '../../objects/game.enum';
 import { Type } from 'class-transformer';
 
 export class LobbyRequestDto {

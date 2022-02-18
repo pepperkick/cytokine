@@ -14,6 +14,9 @@ export class Lobby extends Document {
   @Prop({ type: Date })
   createdAt: Date;
 
+  @Prop({ type: Date })
+  expireAt: Date;
+
   @Prop()
   name: string;
 

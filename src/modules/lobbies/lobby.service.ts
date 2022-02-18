@@ -186,6 +186,9 @@ export class LobbyService {
       options.matchOptions,
     );
 
+    // Create an Expiry Date
+    const expiryDate = new Date();
+
     // Create the Lobby document
     const lobby = new this.repository({
       match: match._id,
@@ -194,6 +197,9 @@ export class LobbyService {
       status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
       distribution: options.distribution,
       createdAt: new Date(),
+      expireAt: expiryDate.setMinutes(
+        expiryDate.getMinutes() + config.lobby.expiry,
+      ),
       createdBy: options.userId,
       requirements: options.requirements,
       queuedPlayers: options.queuedPlayers || [],
@@ -479,6 +485,9 @@ export class LobbyService {
 
     for (const lobby of waitingForPlayerLobbies) {
       setTimeout(async () => {
+        // Check if this waiting lobby has expired
+        if (lobby.expireAt <= new Date()) await this.handleExpiredLobby(lobby);
+
         await this.monitorLobbyForPlayers(lobby);
       }, 100);
     }
@@ -490,6 +499,25 @@ export class LobbyService {
         await this.processLobby(lobby);
       }, 100);
     }
+  }
+
+  /**
+   * Handles a Lobby that has reached its expiry date.
+   * @param lobby The lobby to handle
+   * @noreturn
+   */
+  async handleExpiredLobby(lobby: Lobby): Promise<void> {
+    this.logger.debug(
+      `Lobby with ID '${lobby._id}' has expired ${
+        (new Date().getTime() - lobby.expireAt.getTime()) / 1000
+      } seconds ago`,
+    );
+
+    // Do the status update.
+    await lobby.updateStatus(LobbyStatus.EXPIRED);
+
+    // Close the match
+    await this.matchService.close(lobby.match);
   }
 
   /**

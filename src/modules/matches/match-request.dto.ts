@@ -48,5 +48,6 @@ export class MatchRequestDto {
   preference?: {
     createLighthouseServer?: boolean;
     lighthouseProvider?: string;
+    valveSdr?: boolean;
   };
 }
