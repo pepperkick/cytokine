@@ -38,6 +38,7 @@ export interface Server {
     tvPort?: number;
     tvName?: string;
     map?: string;
+    config?: string;
 
     // For Minecraft
     rconPort?: number;

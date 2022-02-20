@@ -46,6 +46,7 @@ export class Match extends Document {
     createLighthouseServer?: boolean;
     lighthouseProvider?: string;
     valveSdr?: boolean;
+    gameConfig?: string;
   };
 
   updateStatus: (status: MatchStatus, data?: any) => void;

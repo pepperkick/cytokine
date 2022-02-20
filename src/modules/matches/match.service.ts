@@ -173,6 +173,7 @@ export class MatchService {
       preferences: {
         createLighthouseServer: options.preference?.createLighthouseServer,
         lighthouseProvider: options.preference?.lighthouseProvider,
+        gameConfig: options.preference?.gameConfig,
         valveSdr: options.preference?.valveSdr,
       },
     });
@@ -340,6 +341,7 @@ export class MatchService {
         servername: 'Cytokine Match',
         closeMinPlayers: match.players.length,
         closeIdleTime: 300,
+        config: match.preferences?.gameConfig,
         sdrEnable: match.preferences.valveSdr,
       },
     };
