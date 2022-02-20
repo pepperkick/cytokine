@@ -49,6 +49,13 @@ export class Match extends Document {
     gameConfig?: string;
   };
 
+  @Prop({ type: Object })
+  data: {
+    logstfUrl?: string;
+    demostfUrl?: string;
+    teamScore: any;
+  };
+
   updateStatus: (status: MatchStatus, data?: any) => void;
   notify: (data?: any) => void;
 }

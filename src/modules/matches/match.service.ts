@@ -18,6 +18,7 @@ import { Server, ServerStatus } from '../../objects/server.interface';
 import { query } from 'gamedig';
 import axios from 'axios';
 import * as config from '../../../config.json';
+import * as sleep from 'await-sleep';
 import { LobbyService } from '../lobbies/lobby.service';
 import { LobbyStatus } from '../lobbies/lobby-status.enum';
 
@@ -341,15 +342,35 @@ export class MatchService {
         servername: 'Cytokine Match',
         closeMinPlayers: match.players.length,
         closeIdleTime: 300,
-        config: match.preferences?.gameConfig,
+        config: match.preferences.gameConfig,
         sdrEnable: match.preferences.valveSdr,
       },
     };
 
     try {
+      this.logger.debug(`Sending server create request to lighthouse`, options);
       const server = await MatchService.sendServerCreateRequest(options);
       match.server = server._id;
       await match.save();
+    } catch (error) {
+      this.logger.error('Failed to create server', error);
+      await this.updateStatusAndNotify(match, MatchStatus.FAILED);
+      await this.updateLobbyStatusAndNotify(match, LobbyStatus.CLOSED);
+    }
+  }
+
+  /**
+   * Close lighthouse server for the match
+   *
+   * @param match
+   */
+  async closeServerForMatch(match: Match) {
+    try {
+      this.logger.debug(
+        `Sending server close request to lighthouse`,
+        match.server,
+      );
+      await MatchService.sendServerCloseRequest(match.server);
     } catch (error) {
       this.logger.error('Failed to create server', error);
       await this.updateStatusAndNotify(match, MatchStatus.FAILED);
@@ -387,7 +408,8 @@ export class MatchService {
       }
     } else if (
       match.status === MatchStatus.LIVE ||
-      match.status === MatchStatus.WAITING_FOR_PLAYERS
+      match.status === MatchStatus.WAITING_FOR_PLAYERS ||
+      match.status === MatchStatus.WAITING_TO_CLOSE
     ) {
       if (status === ServerStatus.CLOSED || status === ServerStatus.FAILED) {
         await this.updateStatusAndNotify(match, MatchStatus.FINISHED);
@@ -419,6 +441,21 @@ export class MatchService {
     const res = await axios.post(
       `${config.lighthouse.host}/api/v1/servers`,
       options,
+      {
+        headers: {
+          Authorization: `Bearer ${config.lighthouse.clientSecret}`,
+        },
+      },
+    );
+    return res.data;
+  }
+
+  /**
+   * Send a server close request to lighthouse
+   */
+  static async sendServerCloseRequest(id: string): Promise<any> {
+    const res = await axios.delete(
+      `${config.lighthouse.host}/api/v1/servers/${id}`,
       {
         headers: {
           Authorization: `Bearer ${config.lighthouse.clientSecret}`,
@@ -481,7 +518,35 @@ export class MatchService {
 
     for (const match of waitingForPlayersMatches) {
       setTimeout(async () => {
-        await this.monitorMatch(match);
+        await this.monitorWaitingForPlayers(match);
+      }, 100);
+    }
+
+    // Check for waiting for match to start
+    const waitingForMatches = await this.repository.find({
+      status: MatchStatus.WAITING_TO_START,
+    });
+
+    this.logger.debug(
+      `Found ${readyMatches.length} matches that are waiting to start...`,
+    );
+
+    for (const match of waitingForMatches) {
+      setTimeout(async () => {
+        await this.monitorWaitingForStart(match);
+      }, 100);
+    }
+
+    // Check for waiting for match to end
+    const liveMatches = await this.repository.find({
+      status: MatchStatus.LIVE,
+    });
+
+    this.logger.debug(`Found ${liveMatches.length} matches that are live...`);
+
+    for (const match of liveMatches) {
+      setTimeout(async () => {
+        await this.monitorWaitingToEnd(match);
       }, 100);
     }
   }
@@ -506,7 +571,7 @@ export class MatchService {
    *
    * @param match
    */
-  async monitorMatch(match: Match) {
+  async monitorWaitingForPlayers(match: Match) {
     const server = await this.getServerInfo(match.id);
 
     try {
@@ -518,11 +583,106 @@ export class MatchService {
       });
 
       if (data.players.length >= match.players.length) {
-        this.logger.log(`Enough players have joined match ${match._id}`);
-        await match.updateStatus(MatchStatus.LIVE);
+        this.logger.log(
+          `Enough players have joined match ${match._id}, now waiting for match to start`,
+        );
+        await match.updateStatus(MatchStatus.WAITING_TO_START);
       }
     } catch (e) {
       this.logger.error(`Failed to query match '${match.id}': ${e}`);
+    }
+  }
+
+  /**
+   * Monitor the match server to see if match has started
+   *
+   * @param match
+   */
+  async monitorWaitingForStart(match: Match) {
+    const server = await this.getServerInfo(match.id);
+    const data = await this.getHatchInfo(
+      server.ip,
+      server.data.hatchAddress,
+      server.data.hatchPassword,
+    );
+
+    if (data?.matches[0]?.status === 'live') {
+      this.logger.log(`Match ${match._id} has started`);
+      await match.updateStatus(MatchStatus.LIVE);
+    }
+  }
+
+  /**
+   * Monitor the match server to see if match has ended
+   *
+   * @param match
+   */
+  async monitorWaitingToEnd(match: Match) {
+    const server = await this.getServerInfo(match.id);
+    const data = await this.getHatchInfo(
+      server.ip,
+      server.data.hatchAddress,
+      server.data.hatchPassword,
+    );
+
+    if (data?.matches[0]?.status === 'ended') {
+      this.logger.log(`Match ${match._id} has ended`);
+      await match.updateStatus(MatchStatus.WAITING_TO_CLOSE);
+    }
+
+    // Retry multiple times and check if logs and demo files are available
+    let retries = 10;
+    while (retries > 0) {
+      const data = await this.getHatchInfo(
+        server.ip,
+        server.data.hatchAddress,
+        server.data.hatchPassword,
+      );
+      const {
+        logstfUrl: logs,
+        demostfUrl: demo,
+        teamScore: scores,
+      } = data.matches[0];
+
+      if (logs !== '' && demo !== '') {
+        this.logger.log(`Match ${match._id} has logs and demo files ready`);
+
+        match.data.logstfUrl = logs;
+        match.data.demostfUrl = demo;
+        match.data.teamScore = scores;
+        await match.save();
+
+        await this.closeServerForMatch(match);
+        return;
+      }
+
+      await sleep(30 * 1000);
+      retries--;
+    }
+
+    // Close the match anyway if we can't get the logs and demo files
+    this.logger.log(
+      `Match ${match._id}, could not find logs and demo files after multiple retries`,
+    );
+    await this.closeServerForMatch(match);
+  }
+
+  /**
+   * Gets info from Hatch
+   * @param ip The IP of the server to get info from.
+   * @param port The Hatch port
+   * @param password Hatch password
+   * @returns The Hatch document
+   */
+  async getHatchInfo(ip: string, port: string, password: string) {
+    try {
+      const { data } = await axios.get(
+        `http://${ip}${port}/status?password=${password}`,
+      );
+
+      return data;
+    } catch (error) {
+      this.logger.error(error.response.data);
     }
   }
 }
