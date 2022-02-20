@@ -5,6 +5,7 @@ export enum MatchStatus {
   CREATING_SERVER = 'CREATING_SERVER', // Server for this match is being created
   WAITING_FOR_PLAYERS = 'WAITING_FOR_PLAYERS', // Waiting for players to join
   WAITING_TO_START = 'WAITING_TO_START', // Waiting for players to start the match
+  WAITING_TO_CLOSE = 'WAITING_TO_CLOSE', // Waiting for server to close
   LIVE = 'LIVE', // Match is live
   FINISHED = 'FINISHED', // Match has finished
   CLOSED = 'CLOSED', // Match has been forcefully closed by an admin/other

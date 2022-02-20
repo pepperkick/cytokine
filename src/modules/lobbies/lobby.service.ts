@@ -205,6 +205,7 @@ export class LobbyService {
       queuedPlayers: options.queuedPlayers || [],
       maxPlayers: options.matchOptions.requiredPlayers,
       callbackUrl: options.callbackUrl || '',
+      data: {},
     });
     await lobby.save();
 

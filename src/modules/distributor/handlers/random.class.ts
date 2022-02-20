@@ -8,9 +8,9 @@ export class RandomDistributionHandler extends DistributionHandler {
       player.roles.includes('player'),
     );
     const count = [0, 0];
+    const max = filteredPlayer.length / 2;
 
-    players.forEach((player) => {
-      const max = filteredPlayer.length / 2;
+    players.map((player) => {
       const our = Math.floor(Math.random() * count.length);
       const other = our === 0 ? 1 : 0;
 
@@ -18,16 +18,18 @@ export class RandomDistributionHandler extends DistributionHandler {
         return player;
       }
 
-      if (count[our] === max && count[other] === max) {
+      if (count[our] >= max && count[other] >= max) {
         return player;
       }
 
-      if (count[our] === max) {
+      if (count[our] >= max) {
         player.roles.push(other === 0 ? 'team_a' : 'team_b');
+        count[other]++;
         return player;
       }
 
       player.roles.push(our === 0 ? 'team_a' : 'team_b');
+      count[our]++;
       return player;
     });
 
