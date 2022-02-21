@@ -14,12 +14,6 @@ export class Lobby extends Document {
   @Prop({ type: Date })
   createdAt: Date;
 
-  @Prop({ type: Date })
-  expireAt: Date;
-
-  @Prop()
-  name: string;
-
   @Prop()
   match: string;
 
@@ -48,7 +42,9 @@ export class Lobby extends Document {
   createdBy: string;
 
   @Prop({ type: Object })
-  data: {};
+  data: {
+    expiryTime: number;
+  };
 
   updateStatus: (status: LobbyStatus, data?: any) => void;
   notify: (data?: any) => void;

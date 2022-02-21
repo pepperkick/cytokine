@@ -49,7 +49,6 @@ Represents a Lobby where players can join, leave and get general information of 
 This is not the same as a [Match](https://github.com/Qixalite/cytokine#Match) whereas it represents the live game.
 - ``createdAt`` - Date when this Lobby was created
 - ``createdBy`` - Discord ID of the user that created this Lobby
-- ``name`` - A representative, unique (amongst ACTIVE lobbies) name to call this Lobby by
 - ``match`` - MongoDB ID of the [``Match``](https://github.com/Qixalite/cytokine#Match) document linked to this Lobby
 - ``client`` - The Cytokine client ID that allowed this lobby's creation
 - ``callbackUrl`` - URL that points to Regi-Cytokine's service for status update notifications
@@ -65,7 +64,6 @@ Example Document:
 {
   "createdAt": 2022-02-07T21:55:39.486+00:00,
   "createdBy": "112720277883895808",
-  "name": "Python",
   "match": "6201955b7192fa6a68dbdb7b",
   "client": "test",
   "callbackUrl": "http://localhost:3000/lobbies/callback",
@@ -98,6 +96,12 @@ This is not the same as a [Lobby](https://github.com/Qixalite/cytokine#Lobby) wh
 - ``players`` - Array of ``Player`` instances who are locked into this match
 - ``preferences`` - Object with custom parameters for the match
      - ``createLighthouseServer`` - If true, the Match will wait until Lighthouse successfully launches a server for the specified game to continue. Else it will update its status to ``LIVE`` instantly as soon as its criteria are met (full players, met requirements)
+     - ``valveSdr`` - If true, Lighthouse will start the server utilizing **VALVe's SDR**.
+     - ``gameConfig`` - The path (relative to ``tf/cfg/``) of the config that'll be utilized in this Match.
+- ``data`` - Used to store Hatch information from the server once the Match finishes.
+     - ``logstfUrl`` - The URL to the resultant Match log (hosted on https://logs.tf/)
+     - ``demostfUrl`` - The URL to the resultant Match STV demo (hosted on https://demos.tf/)
+     - ``teamScore`` - The scores of both teams at the end of the Match (**FINISHED**)
 
 Example Document:
 ```js
@@ -113,7 +117,10 @@ Example Document:
   "players": [ ... ],
   "preferences": {
     "createLighthouseServer": true
-  }
+    "valveSdr": true,
+    "gameConfig": "ugc/6s_base.cfg"
+  },
+  "data": {}
 }
 ```
 
@@ -207,7 +214,10 @@ Authorization: Bearer <mongodb.cytokine.client.secret>
       "createLighthouseServer": true,
       
       // Wether or not use Valve SDR's system
-      "valveSdr": true
+      "valveSdr": true,
+
+      // The game config to use on the server
+      "gameConfig": "ugc/6s_base.cfg"
     }
 }
 ```
