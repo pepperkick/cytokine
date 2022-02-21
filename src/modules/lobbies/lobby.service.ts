@@ -186,20 +186,13 @@ export class LobbyService {
       options.matchOptions,
     );
 
-    // Create an Expiry Date
-    const expiryDate = new Date();
-
     // Create the Lobby document
     const lobby = new this.repository({
       match: match._id,
       client: client.id,
-      name: options.name,
       status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
       distribution: options.distribution,
       createdAt: new Date(),
-      expireAt: expiryDate.setMinutes(
-        expiryDate.getMinutes() + config.lobby.expiry,
-      ),
       createdBy: options.userId,
       requirements: options.requirements,
       queuedPlayers: options.queuedPlayers || [],
@@ -216,9 +209,10 @@ export class LobbyService {
    * Initiates the closing process of a Lobby.
    * @param client The client that initiated the lobby close.
    * @param id The ID of the Lobby we're closing.
+   * @param expired Optional parameter to indicate the closure is due to an expiry date being reached.
    * @returns The newly updated Lobby document.
    */
-  async close(client: Client, id: string): Promise<Lobby> {
+  async close(client: Client, id: string, expired?: boolean): Promise<Lobby> {
     // TODO: Verify client has access to close a lobby
     // Will do this once the closing logic is finished and start working on 1:1 restrictions
     //
@@ -237,7 +231,7 @@ export class LobbyService {
 
       if (status === MatchStatus.CLOSED) {
         // Begin closing the Lobby (this will also notify Regi-Cytokine)
-        lobby.updateStatus(LobbyStatus.CLOSED);
+        lobby.updateStatus(expired ? LobbyStatus.EXPIRED : LobbyStatus.CLOSED);
 
         // Return the updated Lobby
         return lobby;
@@ -486,9 +480,6 @@ export class LobbyService {
 
     for (const lobby of waitingForPlayerLobbies) {
       setTimeout(async () => {
-        // Check if this waiting lobby has expired
-        if (lobby.expireAt <= new Date()) await this.handleExpiredLobby(lobby);
-
         await this.monitorLobbyForPlayers(lobby);
       }, 100);
     }
@@ -500,25 +491,6 @@ export class LobbyService {
         await this.processLobby(lobby);
       }, 100);
     }
-  }
-
-  /**
-   * Handles a Lobby that has reached its expiry date.
-   * @param lobby The lobby to handle
-   * @noreturn
-   */
-  async handleExpiredLobby(lobby: Lobby): Promise<void> {
-    this.logger.debug(
-      `Lobby with ID '${lobby._id}' has expired ${
-        (new Date().getTime() - lobby.expireAt.getTime()) / 1000
-      } seconds ago`,
-    );
-
-    // Do the status update.
-    await lobby.updateStatus(LobbyStatus.EXPIRED);
-
-    // Close the match
-    await this.matchService.close(lobby.match);
   }
 
   /**
