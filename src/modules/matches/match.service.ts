@@ -177,6 +177,7 @@ export class MatchService {
         gameConfig: options.preference?.gameConfig,
         valveSdr: options.preference?.valveSdr,
       },
+      data: {},
     });
     await match.save();
 
