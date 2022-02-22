@@ -11,8 +11,8 @@ export class RandomDistributionHandler extends DistributionHandler {
     const max = filteredPlayer.length / 2;
 
     players.map((player) => {
-      const our = Math.floor(Math.random() * count.length);
-      const other = our === 0 ? 1 : 0;
+      const our = Math.random();
+      const other = our >= 0.5 ? 1 : 0;
 
       if (!player.roles.includes('player')) {
         return player;
