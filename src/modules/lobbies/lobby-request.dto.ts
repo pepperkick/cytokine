@@ -12,6 +12,11 @@ import { Player } from '../matches/match-player.interfaace';
 import { RoleRequirement } from '../../objects/role.interface';
 import { Type } from 'class-transformer';
 
+export class LobbyDataDto {
+  @IsOptional()
+  expiryTime: number;
+}
+
 export class LobbyRequestDto {
   @IsString()
   @IsNotEmpty()
@@ -40,4 +45,8 @@ export class LobbyRequestDto {
 
   @IsOptional()
   callbackUrl: string;
+
+  @ValidateNested()
+  @Type(() => LobbyDataDto)
+  data: LobbyDataDto;
 }

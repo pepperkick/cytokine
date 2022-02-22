@@ -16,7 +16,6 @@ import { PlayerJoinRequestDto } from './player-join-request.dto';
 import { LobbyStatus } from './lobby-status.enum';
 import { DistributorService } from '../distributor/distributor.service';
 import { MatchStatus } from '../matches/match-status.enum';
-import { LobbyModule } from './lobby.module';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -116,14 +115,10 @@ export class LobbyService {
    * @returns The lobbies created by the user.
    */
   async getAllActiveByUser(id: string): Promise<Lobby[]> {
-    const res = await this.repository.find({
+    return this.repository.find({
       createdBy: id,
       $or: LOBBY_ACTIVE_STATUS_CONDITION,
     });
-
-    console.log(res);
-
-    return res;
   }
 
   /**
@@ -186,6 +181,8 @@ export class LobbyService {
       options.matchOptions,
     );
 
+    this.logger.debug(`Creating lobby with options ${options}`);
+
     // Create the Lobby document
     const lobby = new this.repository({
       match: match._id,
@@ -198,7 +195,9 @@ export class LobbyService {
       queuedPlayers: options.queuedPlayers || [],
       maxPlayers: options.matchOptions.requiredPlayers,
       callbackUrl: options.callbackUrl || '',
-      data: {},
+      data: {
+        expiryTime: options.data.expiryTime || 1800,
+      },
     });
     await lobby.save();
 
@@ -480,16 +479,21 @@ export class LobbyService {
 
     for (const lobby of waitingForPlayerLobbies) {
       setTimeout(async () => {
-        await this.monitorLobbyForPlayers(lobby);
+        await this.monitorLobby(lobby);
       }, 100);
     }
   }
 
-  async monitorLobbyForPlayers(lobby: Lobby) {
+  async monitorLobby(lobby: Lobby) {
+    const createdAt = lobby.createdAt;
+    createdAt.setSeconds(createdAt.getSeconds() + lobby.data.expiryTime);
+
+    if (createdAt <= new Date()) {
+      return this.handleExpiredLobby(lobby);
+    }
+
     if (await this.checkForRequiredPlayers(lobby)) {
-      setTimeout(async () => {
-        await this.processLobby(lobby);
-      }, 100);
+      await this.processLobby(lobby);
     }
   }
 
@@ -513,5 +517,26 @@ export class LobbyService {
     match.players = lobby.queuedPlayers;
     await match.save();
     await match.updateStatus(MatchStatus.LOBBY_READY);
+  }
+
+  /**
+   * Handles a Lobby that has reached its expiry date.
+   * @param lobby The lobby to handle
+   * @noreturn
+   */
+  async handleExpiredLobby(lobby: Lobby): Promise<void> {
+    const createdAt = lobby.createdAt;
+    createdAt.setSeconds(createdAt.getSeconds() + lobby.data.expiryTime);
+    this.logger.debug(
+      `Lobby with ID '${lobby._id}' has expired ${
+        (new Date().getTime() - createdAt.getTime()) / 1000
+      } seconds ago`,
+    );
+
+    // Do the status update.
+    await lobby.updateStatus(LobbyStatus.EXPIRED);
+
+    // Close the match
+    await this.matchService.close(lobby.match);
   }
 }
