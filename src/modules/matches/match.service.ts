@@ -607,7 +607,7 @@ export class MatchService {
       server.data.hatchPassword,
     );
 
-    if (data?.matches[0]?.status === 'live') {
+    if (data?.matches && data?.matches[0]?.status === 'live') {
       this.logger.log(`Match ${match._id} has started`);
       await match.updateStatus(MatchStatus.LIVE);
     }
@@ -629,43 +629,50 @@ export class MatchService {
     if (data?.matches[0]?.status === 'ended') {
       this.logger.log(`Match ${match._id} has ended`);
       await match.updateStatus(MatchStatus.WAITING_TO_CLOSE);
-    }
 
-    // Retry multiple times and check if logs and demo files are available
-    let retries = 10;
-    while (retries > 0) {
-      const data = await this.getHatchInfo(
-        server.ip,
-        server.data.hatchAddress,
-        server.data.hatchPassword,
-      );
-      const {
-        logstfUrl: logs,
-        demostfUrl: demo,
-        teamScore: scores,
-      } = data.matches[0];
+      // Retry multiple times and check if logs and demo files are available
+      let retries = 10;
+      while (retries > 0) {
+        this.logger.debug(
+          `Try to fetch logs and demo files for match ${match._id}...`,
+        );
+        const data = await this.getHatchInfo(
+          server.ip,
+          server.data.hatchAddress,
+          server.data.hatchPassword,
+        );
+        const {
+          logstfUrl: logs,
+          demostfUrl: demo,
+          teamScore: scores,
+        } = data.matches[0];
 
-      if (logs !== '' && demo !== '') {
-        this.logger.log(`Match ${match._id} has logs and demo files ready`);
+        if (logs !== '' && demo !== '') {
+          this.logger.log(`Match ${match._id} has logs and demo files ready`);
 
-        match.data.logstfUrl = logs;
-        match.data.demostfUrl = demo;
-        match.data.teamScore = scores;
-        await match.save();
+          if (!match.data) {
+            match.data = {};
+          }
 
-        await this.closeServerForMatch(match);
-        return;
+          match.data.logstfUrl = logs;
+          match.data.demostfUrl = demo;
+          match.data.teamScore = scores;
+          await match.save();
+
+          await this.closeServerForMatch(match);
+          return;
+        }
+
+        await sleep(30 * 1000);
+        retries--;
       }
 
-      await sleep(30 * 1000);
-      retries--;
+      // Close the match anyway if we can't get the logs and demo files
+      this.logger.log(
+        `Match ${match._id}, could not find logs and demo files after multiple retries`,
+      );
+      await this.closeServerForMatch(match);
     }
-
-    // Close the match anyway if we can't get the logs and demo files
-    this.logger.log(
-      `Match ${match._id}, could not find logs and demo files after multiple retries`,
-    );
-    await this.closeServerForMatch(match);
   }
 
   /**
