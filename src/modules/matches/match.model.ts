@@ -53,7 +53,7 @@ export class Match extends Document {
   data: {
     logstfUrl?: string;
     demostfUrl?: string;
-    teamScore: any;
+    teamScore?: any;
   };
 
   updateStatus: (status: MatchStatus, data?: any) => void;
