@@ -10,7 +10,7 @@ import {
   IsObject,
 } from 'class-validator';
 import { Game } from '../../objects/game.enum';
-import { Player } from './match-player.interfaace';
+import { Player } from './match-player.interface';
 
 export class MatchRequestDto {
   @IsString()

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Player } from '../matches/match-player.interfaace';
+import { Player } from '../matches/match-player.interface';
 import { RoleRequirement } from '../../objects/role.interface';
 import { Document } from 'mongoose';
 import { DistributionType } from '../../objects/distribution.enum';

@@ -8,7 +8,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { DistributionType } from '../../objects/distribution.enum';
-import { Player } from '../matches/match-player.interfaace';
+import { Player } from '../matches/match-player.interface';
 import { RoleRequirement } from '../../objects/role.interface';
 import { Type } from 'class-transformer';
 

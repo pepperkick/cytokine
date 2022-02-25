@@ -16,6 +16,9 @@ import { PlayerJoinRequestDto } from './player-join-request.dto';
 import { LobbyStatus } from './lobby-status.enum';
 import { DistributorService } from '../distributor/distributor.service';
 import { MatchStatus } from '../matches/match-status.enum';
+import { LobbyPlayerRole } from './lobby-player-role.enum';
+import { DistributionType } from 'src/objects/distribution.enum';
+import { TeamRoleBasedHandler } from '../distributor/handlers/team-role-based.class';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -138,13 +141,18 @@ export class LobbyService {
   /**
    * Gets active lobbies where the player is queued in.
    * @param id The Discord ID of the user we're searching for
+   * @param lobbyId The Lobby ID the player is trying to queue in. Pass blank to get all.
    * @returns The Lobby(s) the user is queued in.
    */
-  async getQueuedInLobby(id: string): Promise<Lobby[]> {
-    return this.repository.find({
+  async getQueuedInLobby(id: string, lobbyId: string): Promise<Lobby[]> {
+    const query = {
       queuedPlayers: { $elemMatch: { discord: id } },
       $or: LOBBY_ACTIVE_STATUS_CONDITION,
-    });
+    };
+
+    if (lobbyId.length > 0) query['_id'] = { $ne: lobbyId };
+
+    return this.repository.find(query);
   }
 
   /**
@@ -169,7 +177,7 @@ export class LobbyService {
       });
 
     // Do not allow creation if user is already queued in a lobby
-    if ((await this.getQueuedInLobby(options.userId)).length > 0)
+    if ((await this.getQueuedInLobby(options.userId, '')).length > 0)
       throw new BadRequestException({
         error: true,
         message: `You're already queued in a lobby! Unqueue to create a new one.`,
@@ -253,9 +261,8 @@ export class LobbyService {
     player: PlayerJoinRequestDto,
   ): Promise<Lobby> {
     // TODO: Verify client has access to this lobby
-
     // If the user is already queued in another lobby do not allow them
-    if ((await this.getQueuedInLobby(player.discord)).length > 0)
+    if ((await this.getQueuedInLobby(player.discord, id)).length > 0)
       throw new BadRequestException({
         error: true,
         message: `You're already queued in another lobby!`,
@@ -263,6 +270,7 @@ export class LobbyService {
 
     const lobby = await this.getById(id);
 
+    // Is the current status allowing new players to queue in?
     if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
       throw new BadRequestException({
         error: true,
@@ -270,10 +278,28 @@ export class LobbyService {
       });
     }
 
-    lobby.queuedPlayers.push(player);
-    lobby.markModified('queuedPlayers');
-    await lobby.save();
-    return lobby;
+    // Get the distributiton method for the lobby to know how to handle it.
+    switch (lobby.distribution as DistributionType) {
+      case DistributionType.RANDOM: {
+        // Just add the player to the lobby
+        lobby.queuedPlayers.push(player);
+        lobby.markModified('queuedPlayers');
+        return await lobby.save();
+      }
+      case DistributionType.TEAM_ROLE_BASED: {
+        const handler = new TeamRoleBasedHandler();
+
+        // Is the player not allowed to queue with their current roles?
+        if (!(await handler.isPlayerAllowed(player, lobby)))
+          throw new BadRequestException({
+            error: true,
+            message: `Bad roles: Already occupied or invalid.`,
+          });
+
+        // Add the player to the lobby
+        return await handler.addOrUpdatePlayer(player, lobby);
+      }
+    }
   }
 
   /**
@@ -351,7 +377,7 @@ export class LobbyService {
     id: string,
     pid: string,
     type: 'discord' | 'steam' | 'name',
-    role: string,
+    role: LobbyPlayerRole,
   ) {
     // TODO: Verify client has access to this lobby
 
@@ -371,9 +397,7 @@ export class LobbyService {
         : player.name === pid,
     );
 
-    if (index === -1) {
-      throw new NotFoundException('Player not found');
-    }
+    if (index === -1) throw new NotFoundException('Player not found');
 
     lobby.queuedPlayers[index].roles.push(role);
     lobby.markModified('queuedPlayers');

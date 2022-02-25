@@ -7,6 +7,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { LobbyPlayerRole } from '../lobbies/lobby-player-role.enum';
 
 export class PlayerJoinRequestDto {
   @IsString()
@@ -25,5 +26,5 @@ export class PlayerJoinRequestDto {
 
   @IsArray()
   @IsNotEmpty()
-  roles: string[];
+  roles: LobbyPlayerRole[];
 }

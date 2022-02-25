@@ -19,6 +19,7 @@ import { Lobby } from '../../lobbies/lobby.model';
 import { LobbyRequestDto } from '../../lobbies/lobby-request.dto';
 import { PlayerJoinRequestDto } from '../../lobbies/player-join-request.dto';
 import { Player } from '../../lobbies/lobby-player.interface';
+import { LobbyPlayerRole } from 'src/modules/lobbies/lobby-player-role.enum';
 
 @Controller('/api/v1/lobbies')
 export class LobbiesController {
@@ -136,7 +137,7 @@ export class LobbiesController {
     @Param('id') id: string,
     @Param('pid') pid: string,
     @Param('type') type: 'discord' | 'steam' | 'name',
-    @Param('role') role: string,
+    @Param('role') role: LobbyPlayerRole,
   ): Promise<Lobby> {
     return this.service.addPlayerRole(request.client, id, pid, type, role);
   }

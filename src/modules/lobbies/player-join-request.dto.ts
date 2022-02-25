@@ -1,12 +1,5 @@
-import {
-  IsArray,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { LobbyPlayerRole } from './lobby-player-role.enum';
 
 export class PlayerJoinRequestDto {
   @IsString()
@@ -25,5 +18,5 @@ export class PlayerJoinRequestDto {
 
   @IsArray()
   @IsNotEmpty()
-  roles: string[];
+  roles: LobbyPlayerRole[];
 }

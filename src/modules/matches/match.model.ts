@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { Game } from '../../objects/game.enum';
-import { Player } from './match-player.interfaace';
+import { Player } from './match-player.interface';
 import { MatchStatus } from './match-status.enum';
 import { Logger } from '@nestjs/common';
 import { LobbyStatus } from '../lobbies/lobby-status.enum';
