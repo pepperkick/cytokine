@@ -56,15 +56,14 @@ export class LobbiesController {
   /**
    * Creates a request to close a lobby
    */
-  @Delete('/:id/:expired')
+  @Delete('/:id')
   @UseGuards(ClientGuard)
   @UsePipes(new ValidationPipe({ transform: true }))
   async close(
     @Req() request: RequestWithClient,
     @Param('id') id: string,
-    @Param('expired') expired: boolean,
   ): Promise<Lobby> {
-    return this.service.close(request.client, id, expired);
+    return this.service.close(request.client, id);
   }
 
   /**

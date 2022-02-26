@@ -216,10 +216,9 @@ export class LobbyService {
    * Initiates the closing process of a Lobby.
    * @param client The client that initiated the lobby close.
    * @param id The ID of the Lobby we're closing.
-   * @param expired Optional parameter to indicate the closure is due to an expiry date being reached.
    * @returns The newly updated Lobby document.
    */
-  async close(client: Client, id: string, expired?: boolean): Promise<Lobby> {
+  async close(client: Client, id: string): Promise<Lobby> {
     // TODO: Verify client has access to close a lobby
     // Will do this once the closing logic is finished and start working on 1:1 restrictions
     //
@@ -238,7 +237,7 @@ export class LobbyService {
 
       if (status === MatchStatus.CLOSED) {
         // Begin closing the Lobby (this will also notify Regi-Cytokine)
-        lobby.updateStatus(expired ? LobbyStatus.EXPIRED : LobbyStatus.CLOSED);
+        lobby.updateStatus(LobbyStatus.CLOSED);
 
         // Return the updated Lobby
         return lobby;
