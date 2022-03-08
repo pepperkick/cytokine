@@ -25,6 +25,7 @@ import { LobbyStatus } from '../lobbies/lobby-status.enum';
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
   { status: MatchStatus.WAITING_FOR_PLAYERS },
+  { status: MatchStatus.WAITING_TO_START },
   { status: MatchStatus.LOBBY_READY },
   { status: MatchStatus.CREATING_SERVER },
 ];
@@ -607,7 +608,10 @@ export class MatchService {
       server.data.hatchPassword,
     );
 
-    if (data?.matches && data?.matches[0]?.status === 'live') {
+    if (
+      data?.matches &&
+      data?.matches.filter((m) => m.status === 'live').length > 0
+    ) {
       this.logger.log(`Match ${match._id} has started`);
       await match.updateStatus(MatchStatus.LIVE);
     }
@@ -626,7 +630,10 @@ export class MatchService {
       server.data.hatchPassword,
     );
 
-    if (data?.matches[0]?.status === 'ended') {
+    if (
+      data?.matches &&
+      data?.matches.filter((m) => m.status === 'ended').length > 0
+    ) {
       this.logger.log(`Match ${match._id} has ended`);
       await match.updateStatus(MatchStatus.WAITING_TO_CLOSE);
 
