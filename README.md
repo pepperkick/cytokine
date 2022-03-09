@@ -231,7 +231,7 @@ The newly created [Lobby](https://github.com/Qixalite/cytokine#Lobby) document w
 
 _________________
 
-#### DELETE /api/v1/lobbies/:id/:expired
+#### DELETE /api/v1/lobbies/:id
 Creates a new request to close an active Lobby.
 
 ##### Headers
@@ -241,7 +241,6 @@ Authorization: Bearer <mongodb.cytokine.client.secret>
 
 ##### Parameters
 - ``id`` - The ID of the Lobby we want to close
-- ``expired`` - **Optional**. If true the close request is handled for an **EXPIRED** lobby and not default.
 
 ##### Response
 The updated [Lobby](https://github.com/Qixalite/cytokine#Lobby) document.
@@ -309,6 +308,50 @@ Authorization: Bearer <mongodb.cytokine.client.secret>
   "discord": "112720277883895808",
   "steam": "76561198061538510",
   "roles": [ "creator", "player" ]
+}
+```
+
+_________________
+
+#### POST /api/v1/lobbies/:id/afk
+Sends the AFK player statuses for Cytokine to handle the Lobby's next state.
+
+##### Headers
+```
+Authorization: Bearer <mongodb.cytokine.client.secret>
+```
+
+##### Parameters
+- ``id`` - The ID of the Lobby we're sending the check about.
+
+##### Body
+Array of ``Player`` objects.
+```json
+[
+  {
+    "name": "puntero",
+    "discord": "112720277883895808",
+    "steam": "76561198061538510",
+    "roles": [ "creator", "player" ],
+    "afk": false,
+  },
+  {
+    "name": "PepperKick",
+    "discord": "112720277883895808",
+    "steam": "76561198061538510",
+    "roles": [ "creator", "player" ],
+    "afk": false,
+  }
+]
+```
+
+##### Response
+- ``status`` True if the check passed, the Lobby continues to ``DISTRIBUTING``. False if it failed, Lobby is back in ``WAITING_FOR_REQUIRED_PLAYERS`` and AFK players have been kicked.
+- ``lobby`` The updated [Lobby](https://github.com/Qixalite/cytokine#Lobby) document.
+```js
+{
+  "status": true,
+  "lobby": ...lobby
 }
 ```
 
