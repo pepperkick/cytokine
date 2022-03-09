@@ -22,6 +22,8 @@ import { TeamRoleBasedHandler } from '../distributor/handlers/team-role-based.cl
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
+  { status: LobbyStatus.WAITING_FOR_AFK },
+  { status: LobbyStatus.PICKING },
   { status: LobbyStatus.DISTRIBUTING },
   { status: LobbyStatus.DISTRIBUTED },
 ];
@@ -302,6 +304,66 @@ export class LobbyService {
   }
 
   /**
+   * Handle the AFK status of a Lobby.
+   * @param client
+   * @param id The Lobby ID
+   * @param body The AFK status of all players.
+   * @returns Boolean indicating if passed or not.
+   */
+  async handleAfk(
+    client: Client,
+    id: string,
+    body: PlayerJoinRequestDto[],
+  ): Promise<{ status: boolean; lobby: Lobby }> {
+    const { players } = body as any;
+
+    // Get the lobby with this ID
+    const lobby = await this.getById(id);
+
+    if (!lobby)
+      return {
+        status: false,
+        lobby,
+      };
+
+    // Scan the AFK status of players.
+    // If all of them are false, return true and change the Lobby's status to AFK_PASSED to start processing the match.
+    // If one is true, return false and remove the players with a true AFK status from the Lobby.
+    const afkStatus = players.map((player) => player.afk);
+    if (afkStatus.every((status) => status === false)) {
+      this.logger.debug(
+        `Lobby ${lobby._id} has passed its AFK check. Processing...`,
+      );
+      lobby.status = LobbyStatus.AFK_PASSED;
+      lobby.markModified('status');
+
+      return {
+        status: true,
+        lobby: await lobby.save(),
+      };
+    }
+
+    // If not all of them are false, remove the players with a true AFK status from the Lobby.
+    const afkPlayers = players.filter((player) => player.afk);
+    afkPlayers.forEach((player) => {
+      lobby.queuedPlayers = lobby.queuedPlayers.filter(
+        (queuedPlayer) => queuedPlayer.discord !== player.discord,
+      );
+    });
+    this.logger.debug(
+      `Lobby ${lobby._id} failed the AFK check (${afkPlayers.length} players are AFK).`,
+    );
+    lobby.status = LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS;
+    lobby.markModified('queuedPlayers');
+    lobby.markModified('status');
+
+    return {
+      status: false,
+      lobby: await lobby.save(),
+    };
+  }
+
+  /**
    * Get player in lobby by ID
    *
    * @param client
@@ -345,7 +407,11 @@ export class LobbyService {
 
     const lobby = await this.getById(id);
 
-    if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
+    if (
+      lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS &&
+      lobby.status != LobbyStatus.PICKING &&
+      lobby.status != LobbyStatus.WAITING_FOR_AFK
+    ) {
       throw new BadRequestException({ message: 'Cannot leave this lobby' });
     }
 
@@ -493,7 +559,11 @@ export class LobbyService {
   async monitor(): Promise<void> {
     // Check if required players are present in waiting lobbies
     const waitingForPlayerLobbies = await this.repository.find({
-      status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
+      $or: [
+        { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
+        { status: LobbyStatus.WAITING_FOR_AFK },
+        { status: LobbyStatus.AFK_PASSED },
+      ],
     });
 
     this.logger.debug(
@@ -526,20 +596,33 @@ export class LobbyService {
    * @param lobby
    */
   async processLobby(lobby: Lobby) {
-    this.logger.log(`Lobby ${lobby._id} has enough players!`);
+    this.logger.log(
+      `Lobby ${lobby._id} has enough players! Waiting for AFK check to finish...`,
+    );
     this.logger.debug(lobby);
 
-    await lobby.updateStatus(LobbyStatus.DISTRIBUTING);
-    await this.distributorService.distribute(lobby);
-    await lobby.updateStatus(LobbyStatus.DISTRIBUTED);
+    // If status is WAITING_FOR_AFK, just return to not keep processing.
+    if ((lobby.status as LobbyStatus) === LobbyStatus.WAITING_FOR_AFK) return;
 
-    this.logger.log(`Lobby ${lobby._id} has been distributed!`);
-    this.logger.debug(lobby);
+    // If it's WAITING_FOR_REQUIRED_PLAYERS, set status to WAITING_FOR_AFK
+    if (
+      (lobby.status as LobbyStatus) === LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS
+    )
+      return await lobby.updateStatus(LobbyStatus.WAITING_FOR_AFK);
+    // If the AFK passed, just begin normal flow.
+    else if ((lobby.status as LobbyStatus) === LobbyStatus.AFK_PASSED) {
+      await lobby.updateStatus(LobbyStatus.DISTRIBUTING);
+      await this.distributorService.distribute(lobby);
+      await lobby.updateStatus(LobbyStatus.DISTRIBUTED);
 
-    const match = await this.matchService.getById(lobby.match);
-    match.players = lobby.queuedPlayers;
-    await match.save();
-    await match.updateStatus(MatchStatus.LOBBY_READY);
+      this.logger.log(`Lobby ${lobby._id} has been distributed!`);
+      this.logger.debug(lobby);
+
+      const match = await this.matchService.getById(lobby.match);
+      match.players = lobby.queuedPlayers;
+      await match.save();
+      await match.updateStatus(MatchStatus.LOBBY_READY);
+    }
   }
 
   /**

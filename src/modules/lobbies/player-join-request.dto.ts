@@ -1,4 +1,10 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { LobbyPlayerRole } from './lobby-player-role.enum';
 
 export class PlayerJoinRequestDto {
@@ -19,4 +25,8 @@ export class PlayerJoinRequestDto {
   @IsArray()
   @IsNotEmpty()
   roles: LobbyPlayerRole[];
+
+  @IsBoolean()
+  @IsOptional()
+  afk: boolean;
 }
