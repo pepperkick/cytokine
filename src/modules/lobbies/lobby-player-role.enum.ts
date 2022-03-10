@@ -5,6 +5,7 @@ export enum LobbyPlayerRole {
   CREATOR = 'creator', // User is the creator of the Lobby (currently unused)
   TEAM_A = 'team_a', // User is playing in the A Team
   TEAM_B = 'team_b', // User is playing in the B Team
+  ACTIVE = 'active', // User is not AFK.
 
   // TF2 specific roles
   SCOUT = 'scout', // User is a Scout

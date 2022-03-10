@@ -111,22 +111,6 @@ export class LobbiesController {
   }
 
   /**
-   * Receives data regarding AFK status of a Lobby before it can be distributed. If a true status is passed, then the Lobby goes to DISTRIBUTING.
-   * If not, the Lobby will go back to its WAITING_FOR_REQUIRED_PLAYERS status again, removing players who've failed to pass the AFK check.
-   * Returns an object with the status of the check and the Lobby document.
-   */
-  @Post('/:id/afk')
-  @UseGuards(ClientGuard)
-  @UsePipes(new ValidationPipe())
-  async afkStatus(
-    @Req() request: RequestWithClient,
-    @Body() body: PlayerJoinRequestDto[],
-    @Param('id') id: string,
-  ): Promise<any> {
-    return this.service.handleAfk(request.client, id, body);
-  }
-
-  /**
    * Substitutes a player in the Lobby for another one
    * @param id The ID of the player we're swapping.
    * @body Must contain the player we're replacing the old one for.

@@ -49,6 +49,7 @@ export class MatchRequestDto {
     createLighthouseServer?: boolean;
     lighthouseProvider?: string;
     gameConfig?: string;
+    afkCheck?: boolean;
     valveSdr?: boolean;
   };
 }
