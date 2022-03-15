@@ -19,6 +19,7 @@ import { MatchStatus } from '../matches/match-status.enum';
 import { LobbyPlayerRole } from './lobby-player-role.enum';
 import { DistributionType } from 'src/objects/distribution.enum';
 import { TeamRoleBasedHandler } from '../distributor/handlers/team-role-based.class';
+import { RandomDistributionHandler } from '../distributor/handlers/random.class';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -283,9 +284,39 @@ export class LobbyService {
     switch (lobby.distribution as DistributionType) {
       case DistributionType.RANDOM: {
         // Just add the player to the lobby
-        lobby.queuedPlayers.push(player);
-        lobby.markModified('queuedPlayers');
-        return await lobby.save();
+        const verify = await new RandomDistributionHandler().verify(
+          player,
+          lobby,
+        );
+
+        if (verify > 0) {
+          // Handle a queue in or a role swap if they're already queued.
+          switch (verify) {
+            case -1:
+              throw new BadRequestException({
+                error: true,
+                message: `You are already queued as this role.`,
+              });
+            case 1: {
+              lobby.queuedPlayers.push(player);
+              break;
+            }
+            case 2: {
+              const pLobby = lobby.queuedPlayers.find(
+                (p) => p.discord === player.discord,
+              );
+              pLobby.roles = [...player.roles];
+              break;
+            }
+          }
+
+          lobby.markModified('queuedPlayers');
+          return await lobby.save();
+        } else
+          throw new BadRequestException({
+            error: true,
+            message: `Bad roles: Already occupied, invalid format or other.`,
+          });
       }
       case DistributionType.TEAM_ROLE_BASED: {
         const handler = new TeamRoleBasedHandler();
