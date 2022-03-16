@@ -399,6 +399,64 @@ export class LobbyService {
   }
 
   /**
+   * Substitutes a player in a Lobby for a role.
+   * @param client The Client object
+   * @param lobbyId The ID of the Lobby we're substituting a player in.
+   * @param id ID of the player we're substituting.
+   * @param type The type of the to-be-substituted player ID
+   * @param player The Player we're adding to the Lobby.
+   * @returns An updated Lobby document.
+   */
+  async substitutePlayer(
+    client: Client,
+    lobbyId: string,
+    id: string,
+    type: 'discord' | 'steam' | 'name',
+    player: PlayerJoinRequestDto,
+  ): Promise<Lobby> {
+    // TODO: Verify this client has access to substitution
+
+    // Get the Lobby (must be active) with this ID.
+    const lobby = await this.getById(lobbyId);
+
+    if (!lobby)
+      throw new NotFoundException(`There is no lobby with ID ${lobbyId}.`);
+
+    // Search for the player we're substituting.
+    const fP = lobby.queuedPlayers.find((p) =>
+      type === 'discord'
+        ? p.discord === id
+        : type === 'steam'
+        ? p.steam === id
+        : p.name === id,
+    );
+
+    if (!fP)
+      throw new NotFoundException(
+        `There is no player with ID ${id} in lobby ${lobbyId}.`,
+      );
+
+    // If the role isn't the same, do not allow to swap as this is not a swap.
+    /*if (fP.roles[fP.roles.length - 1] != player.roles[player.roles.length - 1])
+      throw new BadRequestException({
+        message: `Both players have mismatching roles, they must be the same.`,
+      });
+    commented out as I think this will cause issues.
+    */
+
+    // If the player is in the lobby, remove them to add the new one.
+    lobby.queuedPlayers = lobby.queuedPlayers.filter(
+      (p) => p.discord != fP.discord,
+    );
+    lobby.queuedPlayers.push(player);
+
+    // TODO: Add the player to the whitelist mid-match so they can access the server.
+
+    lobby.markModified('queuedPlayers');
+    return await lobby.save();
+  }
+
+  /**
    * Add role to player in lobby
    *
    * @param client
@@ -417,15 +475,6 @@ export class LobbyService {
     // TODO: Verify client has access to this lobby
 
     const lobby = await this.getById(id);
-
-    if (
-      lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS &&
-      lobby.status != LobbyStatus.WAITING_FOR_AFK_CHECK
-    ) {
-      throw new BadRequestException({
-        message: 'Cannot add role for this player in this lobby',
-      });
-    }
 
     const index = lobby.queuedPlayers.findIndex((player) =>
       type === 'discord'

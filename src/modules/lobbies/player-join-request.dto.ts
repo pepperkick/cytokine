@@ -25,8 +25,4 @@ export class PlayerJoinRequestDto {
   @IsArray()
   @IsNotEmpty()
   roles: LobbyPlayerRole[];
-
-  @IsBoolean()
-  @IsOptional()
-  afk: boolean;
 }

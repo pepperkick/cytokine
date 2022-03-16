@@ -112,19 +112,22 @@ export class LobbiesController {
 
   /**
    * Substitutes a player in the Lobby for another one
+   * @param lobby The Lobby ID we're doing the swap in.
    * @param id The ID of the player we're swapping.
+   * @param type The type of ID to identify this player by.
    * @body Must contain the player we're replacing the old one for.
    */
-  @Post('/:id/sub')
+  @Post('/:lobby/sub/:id/:type')
   @UseGuards(ClientGuard)
   @UsePipes(new ValidationPipe())
   async subPlayer(
     @Body() body: PlayerJoinRequestDto,
     @Req() request: RequestWithClient,
+    @Param('lobby') lobby: string,
     @Param('id') id: string,
+    @Param('type') type: 'discord' | 'steam' | 'name',
   ): Promise<Lobby> {
-    // return this.service.subPlayer(request.client, id, body);
-    return null;
+    return this.service.substitutePlayer(request.client, lobby, id, type, body);
   }
 
   /**
