@@ -21,6 +21,7 @@ import * as config from '../../../config.json';
 import * as sleep from 'await-sleep';
 import { LobbyService } from '../lobbies/lobby.service';
 import { LobbyStatus } from '../lobbies/lobby-status.enum';
+import { HatchHandler } from './hatch.handler';
 
 export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.WAITING_FOR_LOBBY },
@@ -372,6 +373,8 @@ export class MatchService {
         `Sending server close request to lighthouse`,
         match.server,
       );
+      const server = await this.getServerInfo(match.id);
+      await HatchHandler.GetForServer(server).kickAll();
       await MatchService.sendServerCloseRequest(match.server);
     } catch (error) {
       this.logger.error('Failed to create server', error);
@@ -397,6 +400,7 @@ export class MatchService {
 
     if (match.status === MatchStatus.CREATING_SERVER) {
       if (status === ServerStatus.IDLE || status === ServerStatus.RUNNING) {
+        await this.setupServer(match);
         await this.updateStatusAndNotify(
           match,
           MatchStatus.WAITING_FOR_PLAYERS,
@@ -416,6 +420,17 @@ export class MatchService {
       if (status === ServerStatus.CLOSED || status === ServerStatus.FAILED) {
         await this.updateStatusAndNotify(match, MatchStatus.FINISHED);
         await this.updateLobbyStatusAndNotify(match, LobbyStatus.CLOSED);
+      }
+    }
+  }
+
+  async setupServer(match: Match) {
+    const server = await this.getServerInfo(match.id);
+    const hatch = await HatchHandler.GetForServer(server);
+
+    for (const player of match.players) {
+      if (player.steam && player.steam != '') {
+        await hatch.addWhitelistPlayer(player);
       }
     }
   }
@@ -498,11 +513,9 @@ export class MatchService {
     const readyMatches = await this.repository.find({
       status: MatchStatus.LOBBY_READY,
     });
-
     this.logger.debug(
       `Found ${readyMatches.length} matches that has their lobby ready...`,
     );
-
     for (const match of readyMatches) {
       setTimeout(async () => {
         await this.processMatch(match);
@@ -513,11 +526,9 @@ export class MatchService {
     const waitingForPlayersMatches = await this.repository.find({
       status: MatchStatus.WAITING_FOR_PLAYERS,
     });
-
     this.logger.debug(
       `Found ${readyMatches.length} matches that are waiting for players...`,
     );
-
     for (const match of waitingForPlayersMatches) {
       setTimeout(async () => {
         await this.monitorWaitingForPlayers(match);
@@ -528,11 +539,9 @@ export class MatchService {
     const waitingForMatches = await this.repository.find({
       status: MatchStatus.WAITING_TO_START,
     });
-
     this.logger.debug(
       `Found ${readyMatches.length} matches that are waiting to start...`,
     );
-
     for (const match of waitingForMatches) {
       setTimeout(async () => {
         await this.monitorWaitingForStart(match);
@@ -543,12 +552,23 @@ export class MatchService {
     const liveMatches = await this.repository.find({
       status: MatchStatus.LIVE,
     });
-
     this.logger.debug(`Found ${liveMatches.length} matches that are live...`);
-
     for (const match of liveMatches) {
       setTimeout(async () => {
         await this.monitorWaitingToEnd(match);
+      }, 100);
+    }
+
+    // Check for waiting for close
+    const waitingToCloseMatches = await this.repository.find({
+      status: MatchStatus.LIVE,
+    });
+    this.logger.debug(
+      `Found ${waitingToCloseMatches.length} matches that are waiting to close...`,
+    );
+    for (const match of liveMatches) {
+      setTimeout(async () => {
+        await this.monitorWaitingToClose(match);
       }, 100);
     }
   }
@@ -602,11 +622,7 @@ export class MatchService {
    */
   async monitorWaitingForStart(match: Match) {
     const server = await this.getServerInfo(match.id);
-    const data = await this.getHatchInfo(
-      server.ip,
-      server.data.hatchAddress,
-      server.data.hatchPassword,
-    );
+    const data = await HatchHandler.GetForServer(server).getStatus();
 
     if (
       data?.matches &&
@@ -624,11 +640,7 @@ export class MatchService {
    */
   async monitorWaitingToEnd(match: Match) {
     const server = await this.getServerInfo(match.id);
-    const data = await this.getHatchInfo(
-      server.ip,
-      server.data.hatchAddress,
-      server.data.hatchPassword,
-    );
+    const data = await HatchHandler.GetForServer(server).getStatus();
 
     if (
       data?.matches &&
@@ -636,68 +648,58 @@ export class MatchService {
     ) {
       this.logger.log(`Match ${match._id} has ended`);
       await match.updateStatus(MatchStatus.WAITING_TO_CLOSE);
-
-      // Retry multiple times and check if logs and demo files are available
-      let retries = 10;
-      while (retries > 0) {
-        this.logger.debug(
-          `Try to fetch logs and demo files for match ${match._id}...`,
-        );
-        const data = await this.getHatchInfo(
-          server.ip,
-          server.data.hatchAddress,
-          server.data.hatchPassword,
-        );
-        const {
-          logstfUrl: logs,
-          demostfUrl: demo,
-          teamScore: scores,
-        } = data.matches[0];
-
-        if (logs !== '' && demo !== '') {
-          this.logger.log(`Match ${match._id} has logs and demo files ready`);
-
-          if (!match.data) {
-            match.data = {};
-          }
-
-          match.data.logstfUrl = logs;
-          match.data.demostfUrl = demo;
-          match.data.teamScore = scores;
-          await match.save();
-
-          await this.closeServerForMatch(match);
-          return;
-        }
-
-        await sleep(30 * 1000);
-        retries--;
-      }
-
-      // Close the match anyway if we can't get the logs and demo files
-      this.logger.log(
-        `Match ${match._id}, could not find logs and demo files after multiple retries`,
-      );
-      await this.closeServerForMatch(match);
     }
   }
 
   /**
-   * Gets info from Hatch
-   * @param ip The IP of the server to get info from.
-   * @param port The Hatch port
-   * @param password Hatch password
-   * @returns The Hatch document
+   * Monitor the match server to see if match has ended
+   *
+   * @param match
    */
-  async getHatchInfo(ip: string, port: string, password: string) {
-    try {
-      const { data } = await axios.get(
-        `http://${ip}${port}/status?password=${password}`,
-      );
-
-      return data;
-    } catch (error) {
-      this.logger.error(error.response.data);
+  async monitorWaitingToClose(match: Match) {
+    if (!match.preferences.createLighthouseServer) {
+      return;
     }
+
+    const server = await this.getServerInfo(match.id);
+
+    // Retry multiple times and check if logs and demo files are available
+    let retries = 10;
+    while (retries > 0) {
+      this.logger.debug(
+        `Trying to fetch logs and demo files for match ${match._id} (${retries} / 10 ) ...`,
+      );
+      const data = await HatchHandler.GetForServer(server).getStatus();
+      const {
+        logstfUrl: logs,
+        demostfUrl: demo,
+        teamScore: scores,
+      } = data.matches[0];
+
+      if (logs !== '' && demo !== '') {
+        this.logger.log(`Match ${match._id} has logs and demo files ready`);
+
+        if (!match.data) {
+          match.data = {};
+        }
+
+        match.data.logstfUrl = logs;
+        match.data.demostfUrl = demo;
+        match.data.teamScore = scores;
+        await match.save();
+
+        await this.closeServerForMatch(match);
+        return;
+      }
+
+      await sleep(30 * 1000);
+      retries--;
+    }
+
+    // Close the match anyway if we can't get the logs and demo files
+    this.logger.warn(
+      `Match ${match._id}, could not find logs and demo files after multiple retries`,
+    );
+    await this.closeServerForMatch(match);
   }
 }
