@@ -31,6 +31,8 @@ export const MATCH_ACTIVE_STATUS_CONDITION = [
   { status: MatchStatus.CREATING_SERVER },
 ];
 
+const alreadyWaitingToClose = {};
+
 export class MatchService {
   private readonly logger = new Logger(MatchService.name);
 
@@ -429,6 +431,7 @@ export class MatchService {
     const hatch = await HatchHandler.GetForServer(server);
 
     for (const player of match.players) {
+      this.logger.debug(`Checking player ${player.steam} for role whitelist`);
       if (player.steam && player.steam != '') {
         await hatch.addWhitelistPlayer(player);
       }
@@ -527,7 +530,7 @@ export class MatchService {
       status: MatchStatus.WAITING_FOR_PLAYERS,
     });
     this.logger.debug(
-      `Found ${readyMatches.length} matches that are waiting for players...`,
+      `Found ${waitingForPlayersMatches.length} matches that are waiting for players...`,
     );
     for (const match of waitingForPlayersMatches) {
       setTimeout(async () => {
@@ -561,12 +564,12 @@ export class MatchService {
 
     // Check for waiting for close
     const waitingToCloseMatches = await this.repository.find({
-      status: MatchStatus.LIVE,
+      status: MatchStatus.WAITING_TO_CLOSE,
     });
     this.logger.debug(
       `Found ${waitingToCloseMatches.length} matches that are waiting to close...`,
     );
-    for (const match of liveMatches) {
+    for (const match of waitingToCloseMatches) {
       setTimeout(async () => {
         await this.monitorWaitingToClose(match);
       }, 100);
@@ -661,7 +664,12 @@ export class MatchService {
       return;
     }
 
+    if (alreadyWaitingToClose[match.id]) {
+      return;
+    }
+
     const server = await this.getServerInfo(match.id);
+    alreadyWaitingToClose[match.id] = true;
 
     // Retry multiple times and check if logs and demo files are available
     let retries = 10;

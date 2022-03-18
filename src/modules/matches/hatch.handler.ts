@@ -32,7 +32,7 @@ export class HatchHandler {
 
       return data;
     } catch (error) {
-      this.logger.error(error.response.data);
+      this.logger.error(error.response);
     }
   }
 
@@ -47,7 +47,7 @@ export class HatchHandler {
 
       return data;
     } catch (error) {
-      this.logger.error(error.response.data);
+      this.logger.error(error.response);
     }
   }
 
@@ -62,7 +62,7 @@ export class HatchHandler {
 
       return data;
     } catch (error) {
-      this.logger.error(error.response.data);
+      this.logger.error(error.response);
     }
   }
 
@@ -77,7 +77,7 @@ export class HatchHandler {
 
       return data;
     } catch (error) {
-      this.logger.error(error.response.data);
+      this.logger.error(error.response);
     }
   }
 
@@ -93,12 +93,12 @@ export class HatchHandler {
         player.roles.includes(<LobbyPlayerRole>'team_a') ||
         player.roles.filter((r) => r.includes('red')).length > 0
       ) {
-        team = 'RED';
+        team = 'red';
       } else if (
         player.roles.includes(<LobbyPlayerRole>'team_b') ||
         player.roles.filter((r) => r.includes('blu')).length > 0
       ) {
-        team = 'BLU';
+        team = 'blu';
       }
 
       if (
@@ -148,6 +148,10 @@ export class HatchHandler {
         role = LobbyPlayerRole.SPY;
       }
 
+      this.logger.debug(
+        `Adding player ${player.steam} to role whitelist (team ${team}, class ${role})`,
+      );
+
       const { data } = await axios.post(
         `http://${this.ip}${this.port}/whitelist/player/?password=${this.password}`,
         {
@@ -160,7 +164,7 @@ export class HatchHandler {
 
       return data;
     } catch (error) {
-      this.logger.error(error.response.data);
+      this.logger.error(error.response);
     }
   }
 
@@ -175,7 +179,7 @@ export class HatchHandler {
 
       return data;
     } catch (error) {
-      this.logger.error(error.response.data);
+      this.logger.error(error.response);
     }
   }
 }
