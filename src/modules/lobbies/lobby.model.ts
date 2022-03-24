@@ -4,8 +4,6 @@ import { RoleRequirement } from '../../objects/role.interface';
 import { Document } from 'mongoose';
 import { DistributionType } from '../../objects/distribution.enum';
 import { LobbyStatus } from './lobby-status.enum';
-import { IsOptional } from 'class-validator';
-import { stat } from 'fs';
 import axios from 'axios';
 import { Logger } from '@nestjs/common';
 
@@ -22,6 +20,12 @@ export class Lobby extends Document {
 
   @Prop()
   callbackUrl: string;
+
+  @Prop({ type: String })
+  region: string;
+
+  @Prop({ type: String })
+  tier: string;
 
   @Prop({ type: String })
   status: LobbyStatus;

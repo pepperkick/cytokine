@@ -199,6 +199,8 @@ export class LobbyService {
       client: client.id,
       status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
       distribution: options.distribution,
+      region: options.matchOptions.region ?? '',
+      tier: options.tier,
       createdAt: new Date(),
       createdBy: options.userId,
       requirements: options.requirements,

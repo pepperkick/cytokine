@@ -41,7 +41,7 @@ export class LobbyRequestDto {
 
   @IsString()
   @IsOptional()
-  name: string;
+  tier: string;
 
   @IsOptional()
   callbackUrl: string;
