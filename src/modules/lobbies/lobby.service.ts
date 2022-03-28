@@ -20,6 +20,7 @@ import { LobbyPlayerRole } from './lobby-player-role.enum';
 import { DistributionType } from 'src/objects/distribution.enum';
 import { TeamRoleBasedHandler } from '../distributor/handlers/team-role-based.class';
 import { RandomDistributionHandler } from '../distributor/handlers/random.class';
+import { HatchHandler } from '../matches/hatch.handler';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
@@ -452,10 +453,14 @@ export class LobbyService {
     );
     lobby.queuedPlayers.push(player);
 
-    // TODO: Add the player to the whitelist mid-match so they can access the server.
-
     lobby.markModified('queuedPlayers');
-    return await lobby.save();
+    await lobby.save();
+
+    const server = await this.matchService.getServerInfo(lobby.match);
+    const hatch = await HatchHandler.GetForServer(server);
+    await hatch.addWhitelistPlayer(player);
+
+    return lobby;
   }
 
   /**

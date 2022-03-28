@@ -430,6 +430,8 @@ export class MatchService {
     const server = await this.getServerInfo(match.id);
     const hatch = await HatchHandler.GetForServer(server);
 
+    await hatch.enableWhitelistRestriction();
+
     for (const player of match.players) {
       this.logger.debug(`Checking player ${player.steam} for role whitelist`);
       if (player.steam && player.steam != '') {
