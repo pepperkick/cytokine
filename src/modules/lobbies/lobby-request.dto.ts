@@ -39,10 +39,6 @@ export class LobbyRequestDto {
   @IsNotEmpty()
   userId: string;
 
-  @IsString()
-  @IsOptional()
-  tier: string;
-
   @IsOptional()
   callbackUrl: string;
 

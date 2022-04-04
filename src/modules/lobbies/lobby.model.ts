@@ -25,9 +25,6 @@ export class Lobby extends Document {
   region: string;
 
   @Prop({ type: String })
-  tier: string;
-
-  @Prop({ type: String })
   status: LobbyStatus;
 
   @Prop({ type: String })
