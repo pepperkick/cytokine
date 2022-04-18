@@ -33,6 +33,9 @@ export class Lobby extends Document {
   @Prop({ type: Object })
   queuedPlayers: Player[];
 
+  @Prop({ type: Array })
+  historicalPlayers: string[];
+
   @Prop({ type: Object })
   requirements: RoleRequirement[];
 
@@ -45,6 +48,7 @@ export class Lobby extends Document {
   @Prop({ type: Object })
   data: {
     expiryTime: number;
+    extraExpiry: number;
   };
 
   updateStatus: (status: LobbyStatus, data?: any) => void;

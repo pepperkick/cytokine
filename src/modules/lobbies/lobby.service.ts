@@ -205,11 +205,13 @@ export class LobbyService {
       createdBy: options.userId,
       requirements: options.requirements,
       queuedPlayers: options.queuedPlayers || [],
+      historicalPlayers: [],
       maxPlayers: options.matchOptions.requiredPlayers,
       callbackUrl: options.callbackUrl || '',
       data: {
         expiryTime: options.data.expiryTime || 1800,
         afkCheck: options.matchOptions.preference.afkCheck ?? true,
+        extraExpiry: 0,
       },
     });
     await lobby.save();
@@ -272,7 +274,7 @@ export class LobbyService {
         message: `You're already queued in another lobby!`,
       });
 
-    const lobby = await this.getById(id);
+    let lobby = await this.getById(id);
 
     // Is the current status allowing new players to queue in?
     if (lobby.status != LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS) {
@@ -313,7 +315,6 @@ export class LobbyService {
           }
 
           lobby.markModified('queuedPlayers');
-          return await lobby.save();
         } else
           throw new BadRequestException({
             error: true,
@@ -331,9 +332,26 @@ export class LobbyService {
           });
 
         // Add the player to the lobby
-        return await handler.addOrUpdatePlayer(player, lobby);
+        lobby = await handler.addOrUpdatePlayer(player, lobby);
       }
     }
+
+    // Add up to the lobby expiry date if a valid add has been issued.
+    // Keep track of players that have previously queued, and only add to the Lobby expiry if this player has never queued yet.
+    if (!lobby.historicalPlayers.includes(player.discord)) {
+      // Add player to the history
+      lobby.historicalPlayers.push(player.discord);
+
+      // Add more expiry time
+      // It's 10% of the original expiry time.
+      lobby.data.extraExpiry += lobby.data.expiryTime * 0.1;
+      lobby.markModified('data.extraExpiry');
+      lobby.markModified('historicalPlayers');
+
+      lobby = await lobby.save();
+    }
+
+    return lobby;
   }
 
   /**
@@ -609,7 +627,11 @@ export class LobbyService {
 
   async monitorLobby(lobby: Lobby) {
     const createdAt = lobby.createdAt;
-    createdAt.setSeconds(createdAt.getSeconds() + lobby.data.expiryTime);
+    createdAt.setSeconds(
+      createdAt.getSeconds() +
+        lobby.data.expiryTime +
+        (lobby.data.extraExpiry ?? 0),
+    );
 
     if (createdAt <= new Date()) {
       return this.handleExpiredLobby(lobby);
