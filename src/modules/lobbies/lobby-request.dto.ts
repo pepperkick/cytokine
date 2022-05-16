@@ -15,6 +15,9 @@ import { Type } from 'class-transformer';
 export class LobbyDataDto {
   @IsOptional()
   expiryTime: number;
+
+  @IsOptional()
+  captainTimeout: number;
 }
 
 export class LobbyRequestDto {

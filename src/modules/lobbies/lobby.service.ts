@@ -21,9 +21,12 @@ import { DistributionType } from 'src/objects/distribution.enum';
 import { TeamRoleBasedHandler } from '../distributor/handlers/team-role-based.class';
 import { RandomDistributionHandler } from '../distributor/handlers/random.class';
 import { HatchHandler } from '../matches/hatch.handler';
+import { CaptainBasedHandler } from '../distributor/handlers/captain.class';
+import { PickRequestDto } from './pick-request.dto';
 
 export const LOBBY_ACTIVE_STATUS_CONDITION = [
   { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
+  { status: LobbyStatus.WAITING_FOR_PICKS },
   { status: LobbyStatus.WAITING_FOR_AFK_CHECK },
   { status: LobbyStatus.DISTRIBUTING },
   { status: LobbyStatus.DISTRIBUTED },
@@ -211,6 +214,7 @@ export class LobbyService {
       data: {
         expiryTime: options.data.expiryTime || 1800,
         afkCheck: options.matchOptions.preference.afkCheck ?? true,
+        captainPickTimeout: options.data.captainTimeout ?? 0,
         extraExpiry: 0,
       },
     });
@@ -334,6 +338,11 @@ export class LobbyService {
         // Add the player to the lobby
         lobby = await handler.addOrUpdatePlayer(player, lobby);
       }
+      case DistributionType.CAPTAIN_BASED: {
+        const handler = new CaptainBasedHandler();
+
+        await handler.updateOrAddPlayer(lobby, player);
+      }
     }
 
     // Add up to the lobby expiry date if a valid add has been issued.
@@ -416,6 +425,131 @@ export class LobbyService {
     lobby.markModified('queuedPlayers');
     await lobby.save();
     return lobby;
+  }
+
+  /**
+   * Performs a pick on a Lobby.
+   * Validates the pick and updates the lobby accordingly.
+   *
+   * Lobby MUST be of type CAPTAIN_BASED and should be in a WAITING_FOR_PICKS status.
+   * @param client The client performing the request.
+   * @param pick The PickRequest object.
+   * @param lobbyId The Lobby ID in which the pick is performed.
+   * @returns An updated Lobby document.
+   */
+  async performPick(
+    client: Client,
+    pick: PickRequestDto,
+    lobbyId: string,
+  ): Promise<Lobby> {
+    // Get the Lobby.
+    const lobby = await this.getById(lobbyId);
+
+    if (!lobby)
+      throw new BadRequestException({
+        error: true,
+        message: 'Lobby does not exist!',
+      });
+
+    // Is this a captain based distribution Lobby?
+    if (lobby.distribution != DistributionType.CAPTAIN_BASED)
+      throw new BadRequestException({
+        error: true,
+        message:
+          'You cannot perform a pick in this Lobby: This is not a captain distribution Lobby.',
+      });
+
+    // Is this Lobby currently on a picking status?
+    if (lobby.status != LobbyStatus.WAITING_FOR_PICKS)
+      throw new BadRequestException({
+        error: true,
+        message:
+          'You cannot perform a pick in this Lobby: Picks are not allowed at this time.',
+      });
+
+    // Check if the pick request owner is a valid captain in the Lobby.
+    const captain = lobby.queuedPlayers.find(
+      (p) =>
+        p.discord === pick.captain &&
+        (p.roles.includes(LobbyPlayerRole.CAPTAIN_A) ||
+          p.roles.includes(LobbyPlayerRole.CAPTAIN_B)),
+    );
+
+    if (!captain)
+      throw new BadRequestException({
+        error: true,
+        message:
+          'You cannot perform a pick in this Lobby: You are not a captain.',
+      });
+
+    // Can the captain perform this pick?
+    // Overfill for a role is allowed, but required amount is set on lobby requirements.
+    // Role counts are generic, so they must be mutliplied by 1/2
+    //
+    // TODO: Move this to the Captain distributor class.
+    let roleAmount = lobby.requirements.find(
+      (r) => r.name === pick.pick.role,
+    ).count;
+
+    if (!roleAmount)
+      throw new BadRequestException({
+        error: true,
+        message: 'You cannot perform a pick in this Lobby: Invalid role.',
+      });
+
+    // Amount per-team.
+    roleAmount /= 2;
+    Math.floor(roleAmount);
+
+    // Get the team this captain is picking in. (0 is RED, 1 is BLU, -1 is Unknown)
+    const team = captain.roles.includes(LobbyPlayerRole.CAPTAIN_A)
+      ? LobbyPlayerRole.TEAM_A
+      : captain.roles.includes(LobbyPlayerRole.CAPTAIN_B)
+      ? LobbyPlayerRole.TEAM_B
+      : null;
+
+    if (team === null)
+      throw new BadRequestException({
+        error: true,
+        message:
+          'You cannot perform a pick in this Lobby: Captain has no defined team.',
+      });
+
+    // Get the amount of players on that team with said role.
+    const teamRoles = lobby.queuedPlayers.filter(
+      (p) => p.roles.includes(pick.pick.role) && p.roles.includes(team),
+    );
+
+    if (teamRoles.length >= roleAmount)
+      throw new BadRequestException({
+        error: true,
+        message: 'You cannot perform a pick in this Lobby: This role is full.',
+      });
+
+    // Get the player being picked.
+    const player = lobby.queuedPlayers.find(
+      (p) => p.discord === pick.pick.player,
+    );
+
+    if (!player)
+      throw new NotFoundException({
+        error: true,
+        message: 'Player is not queued in this Lobby.',
+      });
+
+    // The pick is valid. Let's perform it!
+    player.roles = [
+      LobbyPlayerRole.PLAYER,
+      LobbyPlayerRole.PICKED,
+      team,
+      pick.pick.role,
+      `${team == 'team_a' ? 'red' : 'blu'}-${
+        pick.pick.role
+      }` as LobbyPlayerRole,
+    ];
+    lobby.markModified('queuedPlayers');
+
+    return await lobby.save();
   }
 
   /**
@@ -599,6 +733,12 @@ export class LobbyService {
       } overfilled roles: [${overfilled.map((item) => item.name).join(', ')}]`,
     );
 
+    if (lobby.distribution === DistributionType.CAPTAIN_BASED)
+      return (
+        unfilled.length === 0 &&
+        overfilled.length === 0 &&
+        lobby.queuedPlayers.length >= lobby.maxPlayers
+      );
     return unfilled.length === 0 && overfilled.length === 0;
   }
 
@@ -611,6 +751,7 @@ export class LobbyService {
       $or: [
         { status: LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS },
         { status: LobbyStatus.WAITING_FOR_AFK_CHECK },
+        { status: LobbyStatus.WAITING_FOR_PICKS },
       ],
     });
 
@@ -633,13 +774,16 @@ export class LobbyService {
         (lobby.data.extraExpiry ?? 0),
     );
 
-    if (createdAt <= new Date()) {
+    if (
+      createdAt <= new Date() &&
+      lobby.status !== LobbyStatus.WAITING_FOR_PICKS
+    ) {
       return this.handleExpiredLobby(lobby);
     }
 
     if (await this.checkForRequiredPlayers(lobby))
       await this.processLobby(lobby);
-    else if (lobby.status === LobbyStatus.WAITING_FOR_AFK_CHECK)
+    else if ([LobbyStatus.WAITING_FOR_AFK_CHECK].includes(lobby.status))
       await lobby.updateStatus(LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS);
   }
 
@@ -659,8 +803,112 @@ export class LobbyService {
       (p) => !p.roles.includes(LobbyPlayerRole.ACTIVE),
     );
 
+    // If this Lobby is a captain based lobby, set the status to picking if all required players are in.
+    if (lobby.distribution === DistributionType.CAPTAIN_BASED) {
+      // If the captain based lobby is in the picking status, validate the picks.
+      if (lobby.status === LobbyStatus.WAITING_FOR_PICKS) {
+        // Have all players (non-captains) been picked?
+        const players = lobby.queuedPlayers.filter(
+          (p) =>
+            !p.roles.includes(LobbyPlayerRole.CAPTAIN_A) &&
+            !p.roles.includes(LobbyPlayerRole.CAPTAIN_B) &&
+            p.roles.includes(LobbyPlayerRole.PICKED),
+        );
+
+        if (players.length < lobby.maxPlayers - 2) {
+          this.logger.debug(
+            `Lobby ${lobby._id} has not finished picking. Waiting...`,
+          );
+          return;
+        }
+      }
+
+      if (lobby.status !== LobbyStatus.WAITING_FOR_PICKS) {
+        if (!lobby.data.waitingForPlayersTimeout) {
+          // Set a timeout to allow other players to queue up as a role if they wish to.
+          setTimeout(async () => {
+            // First check if the lobby still has enough players.
+            // Some could have unqueued or been kicked.
+            if (!(await this.checkForRequiredPlayers(lobby))) {
+              this.logger.debug(
+                `Lobby ${lobby._id} does not have enough players to begin the picking process. Reverting...`,
+              );
+              return await lobby.updateStatus(
+                LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS,
+              );
+            }
+
+            // Define captains for the lobby.
+            // If there are no willing captains, select 2 random players as captains.
+            const captains = lobby.queuedPlayers.filter((p) =>
+              p.roles.includes(LobbyPlayerRole.CAN_CAPTAIN),
+            );
+
+            // TODO: could be written better xd
+            let capA, capB;
+            if (captains.length < 2) {
+              const players = lobby.queuedPlayers;
+
+              capA =
+                players[Math.floor(Math.random() * players.length)].discord;
+              // Remove picked player.
+              players.filter((p) => p.discord !== capA);
+
+              capB =
+                players[Math.floor(Math.random() * players.length)].discord;
+            } else if (captains.length === 2) {
+              capA = captains[0].discord;
+              capB = captains[1].discord;
+            } else {
+              capA =
+                captains[Math.floor(Math.random() * captains.length)].discord;
+              // Remove picked player.
+              captains.filter((p) => p.discord !== capA);
+
+              capB =
+                captains[Math.floor(Math.random() * captains.length)].discord;
+            }
+
+            // Set corresponding roles to these players.
+            lobby.queuedPlayers.find((p) => p.discord === capA).roles = [
+              LobbyPlayerRole.CAN_CAPTAIN,
+              LobbyPlayerRole.CAPTAIN_A,
+              LobbyPlayerRole.TEAM_A,
+              LobbyPlayerRole.PLAYER,
+            ];
+            lobby.queuedPlayers.find((p) => p.discord === capB).roles = [
+              LobbyPlayerRole.CAN_CAPTAIN,
+              LobbyPlayerRole.CAPTAIN_B,
+              LobbyPlayerRole.TEAM_B,
+              LobbyPlayerRole.PLAYER,
+            ];
+
+            // Update lobby to picking status now.
+            lobby.status =
+              afk.length > 0
+                ? LobbyStatus.WAITING_FOR_AFK_CHECK
+                : LobbyStatus.WAITING_FOR_PICKS;
+            lobby.markModified('queuedPlayers');
+            lobby.markModified('status');
+            await lobby.save();
+
+            lobby.notify(lobby);
+          }, lobby.data.captainPickTimeout * 1000);
+
+          lobby.data.waitingForPlayersTimeout = true;
+          lobby.markModified('data');
+          await lobby.save();
+        }
+
+        return;
+      }
+    }
+
     // If there is at least one AFK player, wait.
-    if (afk.length > 0) {
+    if (
+      afk.length > 0 &&
+      lobby.distribution !== DistributionType.CAPTAIN_BASED
+    ) {
       // Advertise to Regi that the Lobby is waiting for players to be ready first.
       if (lobby.status === LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS)
         await lobby.updateStatus(LobbyStatus.WAITING_FOR_AFK_CHECK);

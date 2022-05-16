@@ -20,6 +20,7 @@ import { LobbyRequestDto } from '../../lobbies/lobby-request.dto';
 import { PlayerJoinRequestDto } from '../../lobbies/player-join-request.dto';
 import { Player } from '../../lobbies/lobby-player.interface';
 import { LobbyPlayerRole } from 'src/modules/lobbies/lobby-player-role.enum';
+import { PickRequestDto } from 'src/modules/lobbies/pick-request.dto';
 
 @Controller('/api/v1/lobbies')
 export class LobbiesController {
@@ -108,6 +109,22 @@ export class LobbiesController {
     @Param('id') id: string,
   ): Promise<Lobby> {
     return this.service.addPlayer(request.client, id, body);
+  }
+
+  /**
+   * Performs a Lobby pick. Lobby must be of type CAPTAIN_BASED.
+   * @param lobby The Lobby ID we're picking in.
+   * @param body The PickRequest object.
+   */
+  @Post('/:lobby/pick')
+  @UseGuards(ClientGuard)
+  @UsePipes(new ValidationPipe())
+  async pick(
+    @Body() body: PickRequestDto,
+    @Req() request: RequestWithClient,
+    @Param('lobby') lobbyId: string,
+  ): Promise<Lobby> {
+    return this.service.performPick(request.client, body, lobbyId);
   }
 
   /**

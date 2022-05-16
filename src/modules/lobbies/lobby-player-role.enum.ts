@@ -1,7 +1,9 @@
 export enum LobbyPlayerRole {
   PLAYER = 'player', // User is a player in the Lobby
-  CAPTAIN_A = 'captain-a', // User is a captain for team A and can pick players (gets the first pick too)
+  CAN_CAPTAIN = 'can-captain', // User can be a captain in the Lobby (has offered themselves to be one)
+  CAPTAIN_A = 'captain-a', // User is a captain for team A and can pick players
   CAPTAIN_B = 'captain-b', // User is a captain for team B and can pick players
+  PICKED = 'picked', // User has been picked by a captain
   CREATOR = 'creator', // User is the creator of the Lobby (currently unused)
   TEAM_A = 'team_a', // User is playing in the A Team
   TEAM_B = 'team_b', // User is playing in the B Team

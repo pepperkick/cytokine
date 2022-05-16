@@ -49,6 +49,8 @@ export class Lobby extends Document {
   data: {
     expiryTime: number;
     extraExpiry: number;
+    captainPickTimeout: number;
+    waitingForPlayersTimeout: boolean;
   };
 
   updateStatus: (status: LobbyStatus, data?: any) => void;
