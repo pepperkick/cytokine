@@ -324,6 +324,7 @@ export class LobbyService {
             error: true,
             message: `Bad roles: Already occupied, invalid format or other.`,
           });
+        break;
       }
       case DistributionType.TEAM_ROLE_BASED: {
         const handler = new TeamRoleBasedHandler();
@@ -337,11 +338,13 @@ export class LobbyService {
 
         // Add the player to the lobby
         lobby = await handler.addOrUpdatePlayer(player, lobby);
+        break;
       }
       case DistributionType.CAPTAIN_BASED: {
         const handler = new CaptainBasedHandler();
 
         await handler.updateOrAddPlayer(lobby, player);
+        break;
       }
     }
 
