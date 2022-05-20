@@ -900,15 +900,18 @@ export class LobbyService {
           await lobby.save();
         }
 
+        // If there is at least one AFK player, wait.
+        if (
+          afk.length === 0 &&
+          lobby.status === LobbyStatus.WAITING_FOR_AFK_CHECK
+        )
+          await lobby.updateStatus(LobbyStatus.WAITING_FOR_PICKS);
+
         return;
       }
     }
-
     // If there is at least one AFK player, wait.
-    if (
-      afk.length > 0 &&
-      lobby.distribution !== DistributionType.CAPTAIN_BASED
-    ) {
+    else if (afk.length > 0) {
       // Advertise to Regi that the Lobby is waiting for players to be ready first.
       if (lobby.status === LobbyStatus.WAITING_FOR_REQUIRED_PLAYERS)
         await lobby.updateStatus(LobbyStatus.WAITING_FOR_AFK_CHECK);
